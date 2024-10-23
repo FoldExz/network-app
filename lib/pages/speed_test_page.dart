@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
-import 'dart:async'; // Untuk simulasi delay
-import '../services/database_helper.dart';
+import 'package:speed_test_dart/classes/classes.dart';
+import 'package:speed_test_dart/speed_test_dart.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
+import 'dart:math' as math;
 
 class SpeedTestPage extends StatefulWidget {
   const SpeedTestPage({super.key});
@@ -9,57 +12,76 @@ class SpeedTestPage extends StatefulWidget {
   _SpeedTestPageState createState() => _SpeedTestPageState();
 }
 
-class _SpeedTestPageState extends State<SpeedTestPage> {
-  bool isConnected = true; // Status koneksi
-  bool isTesting = false; // Status untuk cek apakah sedang menjalankan tes
+class _SpeedTestPageState extends State<SpeedTestPage>
+    with SingleTickerProviderStateMixin {
+  SpeedTestDart tester = SpeedTestDart();
+  List<Server> bestServersList = [];
   double downloadSpeed = 0.0;
   double uploadSpeed = 0.0;
-  int ping = 0;
+  bool isTesting = false;
+  bool isConnected =
+      false; // Ubah ini menjadi false untuk mode "internet not connected"
+  late AnimationController _rotationController;
 
-  // Fungsi untuk simulasi speed test dan menyimpan hasilnya ke database
-  Future<void> _startSpeedTest() async {
-    setState(() {
-      isTesting = true; // Menandai bahwa tes sedang berjalan
+  @override
+  void initState() {
+    super.initState();
+    // setBestServers();
+    _checkConnection();
+    Connectivity()
+        .onConnectivityChanged
+        .listen((List<ConnectivityResult> results) {
+      setState(() {
+        isConnected = results.contains(ConnectivityResult.mobile) ||
+            results.contains(ConnectivityResult.wifi);
+      });
     });
-
-    // Simulasi delay untuk tes speed (misalnya 3 detik)
-    await Future.delayed(const Duration(seconds: 3));
-
-    // Simulasi hasil speed test
-    downloadSpeed = (10 + (100 - 10) * (1 - 0.5)); // Hasil random
-    uploadSpeed = (5 + (50 - 5) * (1 - 0.5)); // Hasil random
-    ping = 50; // Simulasi ping
-
-    // Simpan hasil ke database
-    await _saveSpeedTestResult(downloadSpeed, uploadSpeed, ping);
-
-    setState(() {
-      isTesting = false; // Mengakhiri status tes
-    });
-
-    // Menampilkan snackbar hasil tes
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-            'Speed test completed!\nDownload: $downloadSpeed Mbps, Upload: $uploadSpeed Mbps, Ping: $ping ms'),
-      ),
+    _rotationController = AnimationController(
+      duration:
+          const Duration(seconds: 5), // Durasi 2 detik untuk satu rotasi penuh
+      vsync: this,
     );
   }
 
-  // Fungsi untuk menyimpan hasil speed test ke SQLite
-  Future<void> _saveSpeedTestResult(
-      double downloadSpeed, double uploadSpeed, int ping) async {
-    Map<String, dynamic> result = {
-      'download_speed': downloadSpeed,
-      'upload_speed': uploadSpeed,
-      'ping': ping,
-      'jitter': 0.0, // Simulasi
-      'packet_loss': 0.0, // Simulasi
-      'test_date': DateTime.now().toString(),
-    };
+  Future<void> setBestServers() async {
+    final settings = await tester.getSettings();
+    final servers = settings.servers;
 
-    int id = await DatabaseHelper().insertSpeedTestResult(result);
-    print('Speed test result saved with ID: $id');
+    final BestServersList = await tester.getBestServers(
+      servers: servers,
+    );
+
+    setState(() {
+      bestServersList = BestServersList;
+    });
+  }
+
+  void _startSpeedTest() async {
+    setState(() {
+      isTesting = true; // Menandai pengujian sedang berlangsung
+      _rotationController.repeat(); // Mulai animasi berputar
+    });
+
+    if (bestServersList.isNotEmpty) {
+      downloadSpeed = await tester.testDownloadSpeed(servers: bestServersList);
+      uploadSpeed = await tester.testUploadSpeed(servers: bestServersList);
+    }
+
+    setState(() {
+      isTesting = false; // Menandai pengujian selesai
+      _rotationController.stop(); // Hentikan animasi berputar
+    });
+  }
+
+  void _checkConnection() async {
+    var connectivityResult = await (Connectivity().checkConnectivity());
+    print("Connectivity result: $connectivityResult"); // Menambahkan logging
+
+    setState(() {
+      // Update isConnected berdasarkan hasil pemeriksaan koneksi
+      isConnected = connectivityResult == ConnectivityResult.mobile ||
+          connectivityResult == ConnectivityResult.wifi;
+    });
   }
 
   @override
@@ -72,7 +94,7 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
     // Membuat ukuran lingkaran proporsional baik berdasarkan lebar maupun tinggi
     double circleSize =
         (screenWidth < screenHeight ? screenWidth : screenHeight) *
-            0.5; // 50% dari lebar atau tinggi
+            0.5; // 50% dari lebar atau tinggi, mana yang lebih kecil
     double borderWidth =
         circleSize * 0.025; // Border 2.5% dari ukuran lingkaran
     double startTextSize =
@@ -85,41 +107,49 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Lingkaran dengan stroke berwarna dan transparan di dalamnya
-          Container(
-            width: circleSize, // Ukuran lingkaran responsif
-            height: circleSize, // Ukuran lingkaran responsif
-            decoration: BoxDecoration(
-              gradient: isConnected
-                  ? const LinearGradient(
-                      colors: [
-                        Color(0xFF00A19C),
-                        Color(0xFF03CAA4),
-                        Color(0xFF96F5A9),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    )
-                  : const LinearGradient(
-                      colors: [
-                        Color(0xFF7A1B34),
-                        Color(0xFFFF2D6A),
-                        Color(0xFFFFA376),
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                    ),
-              shape: BoxShape.circle,
-              border: Border.all(
-                width: borderWidth, // Lebar border responsif
-                color: Colors.transparent, // Border transparan
-              ),
-            ),
-            child: Center(
-              child: GestureDetector(
-                onTap: isTesting
-                    ? null // Tidak bisa ditekan saat tes sedang berlangsung
-                    : _startSpeedTest, // Menjalankan tes saat "START" ditekan
-                child: Container(
+          GestureDetector(
+            onTap: _startSpeedTest,
+            child: Stack(
+              alignment: Alignment.center, // Menjaga teks tetap di tengah
+              children: [
+                // Lingkaran luar
+                AnimatedBuilder(
+                  animation: _rotationController,
+                  builder: (context, child) {
+                    return Transform.rotate(
+                        angle: _rotationController.value *
+                            2 *
+                            math.pi, // Lingkaran berputar
+                        child: Container(
+                          width: circleSize, // Ukuran lingkaran responsif
+                          height: circleSize, // Ukuran lingkaran responsif
+                          decoration: BoxDecoration(
+                            gradient: isConnected
+                                ? const LinearGradient(
+                                    colors: [
+                                      Color.fromARGB(255, 1, 67, 65),
+                                      Color.fromARGB(255, 27, 173, 146),
+                                      Color(0xFF96F5A9),
+                                    ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  )
+                                : const LinearGradient(
+                                    colors: [
+                                      Color(0xFF7A1B34),
+                                      Color(0xFFFF2D6A),
+                                      Color(0xFFFFA376),
+                                    ],
+                                    begin: Alignment.topCenter,
+                                    end: Alignment.bottomCenter,
+                                  ),
+                            shape: BoxShape.circle,
+                          ),
+                        ));
+                  },
+                ),
+                // Teks START di tengah lingkaran
+                Container(
                   width:
                       circleSize - (2 * borderWidth), // Ukuran lingkaran dalam
                   height:
@@ -129,34 +159,30 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
                     color: Colors.black, // Latar belakang hitam
                   ),
                   child: Center(
-                    child: isTesting
-                        ? CircularProgressIndicator(
-                            // Tampilkan loading saat tes sedang berjalan
-                            valueColor:
-                                AlwaysStoppedAnimation<Color>(Colors.white),
-                          )
-                        : Text(
-                            'START',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.w600, // Semi Bold
-                              fontSize:
-                                  startTextSize, // Ukuran font "START" responsif
-                              color: Colors.white,
-                            ),
-                          ),
+                    child: Text(
+                      'START',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600, // Semi Bold
+                        fontSize:
+                            startTextSize, // Ukuran font "START" responsif
+                        color: Colors.white,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
+
           SizedBox(
               height: screenHeight *
                   0.03), // Jarak antara lingkaran dan teks di bawahnya
           Text(
             isConnected
                 ? 'Connected to the internet'
-                : 'Check connection, \ninternet not connected', // Mengubah teks berdasarkan status koneksi
+                // ignore: dead_code
+                : 'internet not connected', // Mengubah teks berdasarkan status koneksi
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Poppins',
@@ -165,6 +191,18 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
               color: Colors.white,
             ),
           ),
+          if (isTesting == true) ...[
+            SizedBox(
+                height: screenHeight * 0.03), // Jarak tambahan saat testing
+            Text(
+              'Download Speed: ${downloadSpeed.toStringAsFixed(2)} Mbps',
+              style: const TextStyle(color: Colors.white, fontSize: 20),
+            ),
+            Text(
+              'Upload Speed: ${uploadSpeed.toStringAsFixed(2)} Mbps',
+              style: const TextStyle(color: Colors.white, fontSize: 20),
+            ),
+          ],
         ],
       ),
     );
