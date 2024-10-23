@@ -31,7 +31,7 @@ class _FileTransferPageState extends State<FileTransferPage> {
                 ],
               ),
             ),
-            Expanded(
+            const Expanded(
               child: TabBarView(
                 children: [
                   HostPage(), // No need to pass hostName
@@ -158,8 +158,8 @@ class _HostPageState extends State<HostPage> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Icon(Icons.cloud, color: Colors.blue),
-        title: Text(server),
-        subtitle: const Text('ssh, user1'),
+        title: Text(server['name'] ?? 'Unknown'), // Menampilkan nama
+        subtitle: Text('SSH: ${server['username']}@${server['hostname']}'),
         onTap: () {
           // Add your action here
         },

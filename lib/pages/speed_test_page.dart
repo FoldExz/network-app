@@ -130,7 +130,7 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
                   ),
                   child: Center(
                     child: isTesting
-                        ? CircularProgressIndicator(
+                        ? const CircularProgressIndicator(
                             // Tampilkan loading saat tes sedang berjalan
                             valueColor:
                                 AlwaysStoppedAnimation<Color>(Colors.white),

@@ -168,7 +168,7 @@ class TerminalPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 20),
                 // TextField Password
-                PasswordField(),
+                const PasswordField(),
                 const SizedBox(height: 20),
                 // Button Continue
                 ElevatedButton(
