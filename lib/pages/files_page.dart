@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../services/database_helper.dart';
 
 // Central list to store all available host servers
-List<String> hostServers = [];
+List<Map<String, String>> hostServers = [];
 
 class FileTransferPage extends StatefulWidget {
   const FileTransferPage({super.key});
@@ -31,11 +32,11 @@ class _FileTransferPageState extends State<FileTransferPage> {
                 ],
               ),
             ),
-            const Expanded(
+            Expanded(
               child: TabBarView(
                 children: [
-                  HostPage(), // No need to pass hostName
-                  HostPage(), // Shared logic for both
+                  HostPage(),
+                  HostPage(),
                 ],
               ),
             ),
@@ -90,25 +91,52 @@ class _PasswordFieldState extends State<PasswordField> {
 }
 
 class HostPage extends StatefulWidget {
-  const HostPage({super.key}); // No hostName needed anymore
+  const HostPage({super.key});
 
   @override
   _HostPageState createState() => _HostPageState();
 }
 
 class _HostPageState extends State<HostPage> {
-  late List<String> servers;
+  late List<Map<String, String>> servers;
+  bool _isLoading = true;
+  final DatabaseHelper dbHelper = DatabaseHelper();
 
   @override
   void initState() {
     super.initState();
-    servers = hostServers; // Use the global shared list of servers
+    servers = []; // Initialize with an empty list
+    _loadServers();
+  }
+
+  Future<void> _loadServers() async {
+    try {
+      final serverList = await dbHelper.getHostServers();
+      setState(() {
+        servers = serverList.map((server) {
+          return {
+            'name': server['name'] ?? 'Unknown',
+            'hostname': server['hostname'] ?? '',
+            'port': server['port'] ?? '',
+            'username': server['username'] ?? '',
+            'password': server['password'] ?? '',
+            'key': server['key'] ?? '',
+          };
+        }).toList();
+        _isLoading = false; // Loading complete
+      });
+    } catch (error) {
+      setState(() {
+        _isLoading = false; // Still update the state
+      });
+      // Handle the error (e.g., show a message)
+      print('Error loading servers: $error');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Remove AppBar and title to save space
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -121,19 +149,23 @@ class _HostPageState extends State<HostPage> {
             ),
             const SizedBox(height: 20),
             Expanded(
-              child: servers.isEmpty
+              child: _isLoading
                   ? const Center(
-                      child: Text(
-                        "Belum ada server",
-                        style: TextStyle(fontSize: 16, color: Colors.grey),
-                      ),
+                      child: CircularProgressIndicator(),
                     )
-                  : ListView.builder(
-                      itemCount: servers.length,
-                      itemBuilder: (context, index) {
-                        return _buildHostTile(servers[index]);
-                      },
-                    ),
+                  : servers.isEmpty
+                      ? const Center(
+                          child: Text(
+                            "Belum ada server",
+                            style: TextStyle(fontSize: 16, color: Colors.grey),
+                          ),
+                        )
+                      : ListView.builder(
+                          itemCount: servers.length,
+                          itemBuilder: (context, index) {
+                            return _buildHostTile(servers[index]);
+                          },
+                        ),
             ),
           ],
         ),
@@ -152,16 +184,16 @@ class _HostPageState extends State<HostPage> {
     );
   }
 
-  Widget _buildHostTile(String server) {
+  Widget _buildHostTile(Map<String, String> server) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Icon(Icons.cloud, color: Colors.blue),
-        title: Text(server['name'] ?? 'Unknown'), // Menampilkan nama
+        title: Text(server['name'] ?? 'Unknown'),
         subtitle: Text('SSH: ${server['username']}@${server['hostname']}'),
         onTap: () {
-          // Add your action here
+          // Define what happens when the host is tapped
         },
       ),
     );
@@ -181,9 +213,7 @@ class _HostPageState extends State<HostPage> {
       builder: (BuildContext context) {
         return Padding(
           padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context)
-                .viewInsets
-                .bottom, // Sesuaikan dengan keyboard
+            bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
           child: Container(
             padding: const EdgeInsets.all(16),
@@ -194,7 +224,6 @@ class _HostPageState extends State<HostPage> {
             child: StatefulBuilder(
               builder: (context, setState) {
                 return SingleChildScrollView(
-                  // Wrap the form with SingleChildScrollView
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -224,8 +253,6 @@ class _HostPageState extends State<HostPage> {
                         ],
                       ),
                       const SizedBox(height: 20),
-
-                      // Form fields
                       TextField(
                         onChanged: (value) => name = value,
                         style: const TextStyle(color: Colors.white),
@@ -306,11 +333,20 @@ class _HostPageState extends State<HostPage> {
                       ),
                       const SizedBox(height: 20),
                       ElevatedButton(
-                        onPressed: () {
-                          // Tambahkan server baru ke daftar global
-                          setState(() {
-                            hostServers.add(name);
+                        onPressed: () async {
+                          // Menyimpan server baru ke database
+                          await dbHelper.insertHostServer({
+                            'name': name,
+                            'hostname': hostname,
+                            'port': port,
+                            'username': username,
+                            'password': password,
+                            'key': key,
                           });
+
+                          // Memuat ulang server setelah penambahan
+                          await _loadServers();
+
                           Navigator.pop(context);
                         },
                         style: ElevatedButton.styleFrom(
