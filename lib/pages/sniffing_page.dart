@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:flutter_network_inspector/client/network_inspector_client.dart';
+import 'package:flutter_network_inspector/models/inspector_result.dart';
 
 class SniffingPage extends StatefulWidget {
   const SniffingPage({super.key});
@@ -9,25 +11,39 @@ class SniffingPage extends StatefulWidget {
 }
 
 class _SniffingPageState extends State<SniffingPage> {
-  bool isStarted = false; // Menyimpan status mulai
-  // Dummy data untuk tabel
-  final List<Map<String, dynamic>> _dummyData = List.generate(10, (index) {
-    return {
-      "No": index + 1,
-      "Time": "0.${index + 1}2:30:00",
-      "Source": "192.168.1.${index + 1}",
-      "Destination": "224.0.0.1",
-      "Proto.": "MDNS",
-      "Length": "330",
-      "Info": "Standard query",
-    };
-  });
+  bool isStarted = false;
+  final FNICLient _client = FNICLient();
+  final List<InspectorResult> _sniffedData = [];
 
-  // Fungsi untuk mengubah status mulai
+  @override
+  void initState() {
+    super.initState();
+    FNICLient.inspectorNotifierList.addListener(_updateSniffedData);
+  }
+
+  @override
+  void dispose() {
+    FNICLient.inspectorNotifierList.removeListener(_updateSniffedData);
+    _client.close();
+    super.dispose();
+  }
+
+  void _updateSniffedData() {
+    setState(() {
+      _sniffedData.clear();
+      _sniffedData.addAll(FNICLient.inspectorNotifierList.value);
+    });
+  }
+
   void _toggleStart() {
     setState(() {
-      isStarted = !isStarted; // Mengubah status mulai
+      isStarted = !isStarted;
+      _client.setEnableLogging(isStarted); // Logging aktif saat sniffing mulai
     });
+  }
+
+  void _saveSniffedData() {
+    // Implementasi penyimpanan data jika diperlukan
   }
 
   @override
@@ -35,24 +51,20 @@ class _SniffingPageState extends State<SniffingPage> {
     var mediaQuery = MediaQuery.of(context);
     double screenWidth = mediaQuery.size.width;
 
-    // Menyesuaikan ukuran kolom
-    double headerHeight = 28; // Tinggi header yang lebih kecil
-    double rowHeight = 22; // Tinggi setiap baris yang lebih kecil
-    double noWidth = screenWidth * 0.09; // 9% untuk No.
-    double timeWidth = screenWidth * 0.11; // 11% untuk Time
-    double sourceWidth = screenWidth * 0.19; // 19% untuk Source
-    double destinationWidth = screenWidth * 0.19; // 19% untuk Destination
-    double protoWidth =
-        screenWidth * 0.13; // 13% untuk Proto. (diperbesar sedikit)
-    double lengthWidth =
-        screenWidth * 0.13; // 13% untuk Length (diperbesar sedikit)
-    double infoWidth = screenWidth * 0.15; // 15% untuk Info (diperkecil)
+    double headerHeight = 28;
+    double rowHeight = 22;
+    double noWidth = screenWidth * 0.09;
+    double timeWidth = screenWidth * 0.11;
+    double sourceWidth = screenWidth * 0.19;
+    double destinationWidth = screenWidth * 0.19;
+    double protoWidth = screenWidth * 0.13;
+    double lengthWidth = screenWidth * 0.13;
+    double infoWidth = screenWidth * 0.15;
 
     return Scaffold(
       body: Column(
         children: [
-          const SizedBox(height: 50), // Jarak 20 piksel dari bagian atas
-          // Menambahkan judul dan ikon di atas tabel
+          const SizedBox(height: 50),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
@@ -73,33 +85,27 @@ class _SniffingPageState extends State<SniffingPage> {
                       onTap: _toggleStart,
                       child: SvgPicture.asset(
                         'assets/icons/start.svg',
-                        color: isStarted
-                            ? const Color(0xFF666666)
-                            : null, // Warna jika aktif
-                        height: 24, // Ukuran ikon lebih besar
+                        color: isStarted ? const Color(0xFF666666) : null,
+                        height: 24,
                         width: 24,
                       ),
                     ),
-                    const SizedBox(width: 8), // Mengurangi jarak
+                    const SizedBox(width: 8),
                     GestureDetector(
-                      onTap: isStarted ? () => _toggleStart() : null,
+                      onTap: isStarted ? _toggleStart : null,
                       child: SvgPicture.asset(
                         'assets/icons/stop.svg',
-                        color: isStarted
-                            ? null
-                            : const Color(0xFF666666), // Warna jika tidak aktif
-                        height: 24, // Ukuran ikon lebih besar
+                        color: isStarted ? null : const Color(0xFF666666),
+                        height: 24,
                         width: 24,
                       ),
                     ),
-                    const SizedBox(width: 8), // Mengurangi jarak
+                    const SizedBox(width: 8),
                     GestureDetector(
-                      onTap: () {
-                        // Implementasi fungsi save
-                      },
+                      onTap: _saveSniffedData,
                       child: SvgPicture.asset(
                         'assets/icons/save.svg',
-                        height: 24, // Ukuran ikon lebih besar
+                        height: 24,
                         width: 24,
                       ),
                     ),
@@ -108,10 +114,8 @@ class _SniffingPageState extends State<SniffingPage> {
               ],
             ),
           ),
-          // Header Tabel
           Container(
-            color: const Color(
-                0xFF14172A), // Mengubah warna latar belakang menjadi hitam
+            color: const Color(0xFF14172A),
             height: headerHeight,
             child: Row(
               children: [
@@ -125,22 +129,28 @@ class _SniffingPageState extends State<SniffingPage> {
               ],
             ),
           ),
-          // Tabel Data
           Expanded(
             child: SingleChildScrollView(
               child: Column(
-                children: _dummyData.map((data) {
+                children: _sniffedData.asMap().entries.map((entry) {
+                  int index = entry.key + 1;
+                  InspectorResult data = entry.value;
+
                   return Row(
                     children: [
+                      _buildTableCell(index.toString(), noWidth, rowHeight),
+                      _buildTableCell(data.startTime?.toIso8601String() ?? '-',
+                          timeWidth, rowHeight),
                       _buildTableCell(
-                          data["No"].toString(), noWidth, rowHeight),
-                      _buildTableCell(data["Time"], timeWidth, rowHeight),
-                      _buildTableCell(data["Source"], sourceWidth, rowHeight),
+                          data.url?.host ?? '-', sourceWidth, rowHeight),
                       _buildTableCell(
-                          data["Destination"], destinationWidth, rowHeight),
-                      _buildTableCell(data["Proto."], protoWidth, rowHeight),
-                      _buildTableCell(data["Length"], lengthWidth, rowHeight),
-                      _buildTableCell(data["Info"], infoWidth, rowHeight),
+                          data.url?.path ?? '-', destinationWidth, rowHeight),
+                      _buildTableCell(data.statusCode?.toString() ?? '-',
+                          protoWidth, rowHeight),
+                      _buildTableCell(data.responseBodyBytes?.toString() ?? '-',
+                          lengthWidth, rowHeight),
+                      _buildTableCell(
+                          data.reasonPhrase ?? '-', infoWidth, rowHeight),
                     ],
                   );
                 }).toList(),
@@ -156,10 +166,9 @@ class _SniffingPageState extends State<SniffingPage> {
     return Container(
       width: width,
       height: 28,
-      alignment: Alignment.centerLeft, // Rata kiri
+      alignment: Alignment.centerLeft,
       color: const Color(0xFF14172A),
-      padding: const EdgeInsets.symmetric(
-          horizontal: 8), // Menambahkan padding horizontal
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Text(
         title,
         style: const TextStyle(
@@ -172,16 +181,15 @@ class _SniffingPageState extends State<SniffingPage> {
     return Container(
       width: width,
       height: height,
-      alignment: Alignment.centerLeft, // Rata kiri
+      alignment: Alignment.centerLeft,
       decoration: const BoxDecoration(
         border: Border(bottom: BorderSide(color: Colors.white)),
       ),
-      padding: const EdgeInsets.symmetric(
-          horizontal: 8), // Menambahkan padding horizontal
+      padding: const EdgeInsets.symmetric(horizontal: 8),
       child: Text(
         content,
         style: const TextStyle(fontFamily: 'Poppins', fontSize: 10),
-        overflow: TextOverflow.ellipsis, // Menambahkan pengendalian overflow
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
