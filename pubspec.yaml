@@ -12,6 +12,7 @@ dependencies:
   flutter_svg: ^2.0.7    # Tambahkan baris ini untuk package flutter_svg
   connectivity_plus: ^6.0.5
   flutter_network_inspector: ^0.1.8
+  http: ^1.2.2
 
 
 dev_dependencies:

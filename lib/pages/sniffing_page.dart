@@ -1,7 +1,8 @@
+import 'dart:async'; // Impor untuk Timer
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:flutter_network_inspector/client/network_inspector_client.dart';
 import 'package:flutter_network_inspector/models/inspector_result.dart';
+import 'package:http/http.dart' as http;
 
 class SniffingPage extends StatefulWidget {
   const SniffingPage({super.key});
@@ -14,6 +15,7 @@ class _SniffingPageState extends State<SniffingPage> {
   bool isStarted = false;
   final FNICLient _client = FNICLient();
   final List<InspectorResult> _sniffedData = [];
+  Timer? _timer; // Menambahkan Timer
 
   @override
   void initState() {
@@ -24,22 +26,59 @@ class _SniffingPageState extends State<SniffingPage> {
   @override
   void dispose() {
     FNICLient.inspectorNotifierList.removeListener(_updateSniffedData);
+    _timer?.cancel(); // Hentikan timer saat dispose
     _client.close();
     super.dispose();
   }
 
   void _updateSniffedData() {
+    final sniffedData = FNICLient.inspectorNotifierList.value;
+
     setState(() {
-      _sniffedData.clear();
-      _sniffedData.addAll(FNICLient.inspectorNotifierList.value);
+      _sniffedData.clear(); // Kosongkan data sebelumnya
+      _sniffedData.addAll(sniffedData); // Menambahkan data yang baru
     });
   }
 
   void _toggleStart() {
     setState(() {
       isStarted = !isStarted;
-      _client.setEnableLogging(isStarted); // Logging aktif saat sniffing mulai
+      _client.setEnableLogging(isStarted); // Mengatur logging
+
+      if (isStarted) {
+        print("Sniffing started: $isStarted");
+        _sniffedData.clear(); // Kosongkan daftar data saat mulai
+        _startRequestLoop(); // Mulai loop permintaan
+      } else {
+        print("Sniffing stopped: $isStarted");
+        _timer?.cancel(); // Hentikan timer saat berhenti
+      }
     });
+  }
+
+  void _startRequestLoop() {
+    // Mengatur timer untuk mengirimkan permintaan setiap 2 detik
+    _timer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+      await _makeRequest();
+    });
+  }
+
+  Future<void> _makeRequest() async {
+    if (!isStarted) return; // Pastikan sniffing aktif
+
+    try {
+      print("Sending request to https://jsonplaceholder.typicode.com/posts");
+
+      var response = await _client
+          .get(Uri.parse('https://jsonplaceholder.typicode.com/posts'));
+
+      if (response.statusCode == 200) {
+        print("Response status: ${response.statusCode}");
+        print("Response body: ${response.body}");
+      }
+    } catch (e) {
+      print("Error during request: $e");
+    }
   }
 
   void _saveSniffedData() {
@@ -192,5 +231,34 @@ class _SniffingPageState extends State<SniffingPage> {
         overflow: TextOverflow.ellipsis,
       ),
     );
+  }
+}
+
+class FNICLient {
+  static final ValueNotifier<List<InspectorResult>> inspectorNotifierList =
+      ValueNotifier([]);
+
+  Future<http.Response> get(Uri url) async {
+    InspectorResult result =
+        InspectorResult(url: url, startTime: DateTime.now());
+    inspectorNotifierList.value.add(result);
+    inspectorNotifierList.notifyListeners();
+
+    final response = await http.get(url);
+
+    result.statusCode = response.statusCode;
+    result.reasonPhrase = response.reasonPhrase;
+    result.responseBodyBytes = response.bodyBytes.length;
+
+    inspectorNotifierList.notifyListeners();
+    return response;
+  }
+
+  void setEnableLogging(bool enable) {
+    // Implementasi untuk mengatur logging
+  }
+
+  void close() {
+    // Implementasi untuk menutup koneksi jika diperlukan
   }
 }
