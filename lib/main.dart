@@ -1,6 +1,4 @@
-import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter1/firebase_options.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter1/pages/speed_test_page.dart';
 import 'package:flutter1/pages/sniffing_page.dart';
@@ -8,11 +6,7 @@ import 'package:flutter1/pages/terminal_page.dart';
 import 'package:flutter1/pages/vpn_page.dart';
 import 'package:flutter1/pages/files_page.dart';
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform,
-  );
+void main() {
   runApp(const MainApp());
 }
 
