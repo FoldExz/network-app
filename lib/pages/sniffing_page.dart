@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_network_inspector/models/inspector_result.dart';
@@ -7,9 +8,7 @@ import 'package:http/http.dart' as http;
 
 class NetworkStatusPopup extends StatelessWidget {
   final double successRate;
-
   final int avgResponseTime;
-
   final int totalDataReceived;
 
   const NetworkStatusPopup({
@@ -24,13 +23,17 @@ class NetworkStatusPopup extends StatelessWidget {
     var mediaQuery = MediaQuery.of(context);
     double screenWidth = mediaQuery.size.width;
 
+    // Tentukan teks berdasarkan kondisi successRate
+    String networkStatusText = successRate >= 80
+        ? 'Jaringan Anda stabil'
+        : 'Jaringan Anda tidak stabil';
+
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding:
-            EdgeInsets.only(bottom: 70.0, top: 20.0), // Ubah nilai padding atas
+        padding: EdgeInsets.only(bottom: 70.0, top: 20.0),
         child: Container(
-          width: screenWidth * 0.9, // Atur lebar menjadi 90% dari lebar layar
+          width: screenWidth * 0.9,
           decoration: BoxDecoration(
             color: Color(0xFF15181F).withOpacity(0.9),
             borderRadius: BorderRadius.circular(20),
@@ -41,7 +44,7 @@ class NetworkStatusPopup extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Jaringan anda stabil',
+                networkStatusText,
                 style: TextStyle(
                   color: Colors.white,
                   fontSize: 20,
@@ -51,11 +54,14 @@ class NetworkStatusPopup extends StatelessWidget {
               const SizedBox(height: 20),
               Row(
                 children: [
-                  Icon(Icons.check_box, color: Colors.green),
+                  Icon(
+                    successRate >= 80 ? Icons.check_box : Icons.error,
+                    color: successRate >= 80 ? Colors.green : Colors.red,
+                  ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Jaringan stabil dengan ${successRate.toStringAsFixed(1)}% permintaan berhasil',
+                      'Jaringan ${successRate >= 80 ? "stabil" : "tidak stabil"} dengan ${successRate.toStringAsFixed(1)}% permintaan berhasil',
                       style: TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -132,31 +138,68 @@ class _SniffingPageState extends State<SniffingPage> {
     });
   }
 
+  void _calculateNetworkMetrics() {
+    if (_sniffedData.isEmpty) return;
+
+    int successfulRequests =
+        _sniffedData.where((result) => result.statusCode == 200).length;
+    double successRate = (successfulRequests / _sniffedData.length) * 100;
+
+    int totalResponseTime = 0;
+    int totalDataReceived = 0;
+
+    for (var result in _sniffedData) {
+      if (result.startTime != null && result.endTime != null) {
+        int responseTime =
+            result.endTime!.difference(result.startTime!).inMilliseconds;
+        totalResponseTime += responseTime;
+        print("Response Time for ${result.url}: $responseTime ms");
+      } else {
+        print("Incomplete timing for ${result.url}");
+      }
+
+      // Menambah ukuran data yang diterima dari setiap respons ke total
+      totalDataReceived += result.responseBodyBytes ?? 0;
+    }
+
+    int avgResponseTime = _sniffedData.isNotEmpty
+        ? (totalResponseTime / _sniffedData.length).round()
+        : 0;
+
+    // Tampilkan popup dengan hasil perhitungan
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (BuildContext context) {
+        return NetworkStatusPopup(
+          successRate: successRate,
+          avgResponseTime: avgResponseTime,
+          totalDataReceived:
+              (totalDataReceived / 1024).round(), // Konversi ke KB
+        );
+      },
+    );
+  }
+
   void _toggleStart() {
     setState(() {
       isStarted = !isStarted;
-      _client.setEnableLogging(isStarted); // Mengatur logging
+      _client.setEnableLogging(isStarted);
 
       if (isStarted) {
         print("Sniffing started: $isStarted");
-        _sniffedData.clear(); // Kosongkan daftar data saat mulai
-        _networkAnalysisSummary = ''; // Hapus analisis lama
-        _startRequestLoop(); // Mulai loop permintaan
+
+        // Kosongkan data di `_sniffedData` dan `inspectorNotifierList`
+        _sniffedData.clear();
+        FNICLient.inspectorNotifierList.value = [];
+        FNICLient.inspectorNotifierList.notifyListeners();
+
+        _networkAnalysisSummary = '';
+        _startRequestLoop();
       } else {
         print("Sniffing stopped: $isStarted");
-        _timer?.cancel(); // Hentikan timer saat berhenti
-        // Tampilkan NetworkStatusPopup ketika berhenti
-        showModalBottomSheet(
-          context: context,
-          backgroundColor: Colors.transparent, // Agar tampak transparan
-          builder: (BuildContext context) {
-            return NetworkStatusPopup(
-              successRate: 98.5, // Ganti dengan data yang sebenarnya
-              avgResponseTime: 150, // Ganti dengan data yang sebenarnya
-              totalDataReceived: 1024, // Ganti dengan data yang sebenarnya
-            );
-          },
-        );
+        _timer?.cancel();
+        _calculateNetworkMetrics(); // Hitung dan tampilkan metrik
       }
     });
   }
@@ -189,10 +232,9 @@ class _SniffingPageState extends State<SniffingPage> {
       // Tentukan metode HTTP berdasarkan endpoint yang dipilih
       String requestMethod;
       if (selectedEndpoint == '/posts') {
-        requestMethod = 'GET';
+        requestMethod = 'POST';
       } else if (selectedEndpoint == '/posts/1') {
-        requestMethod =
-            Random().nextBool() ? 'PUT' : 'PATCH'; // 50/50 untuk PUT dan PATCH
+        requestMethod = Random().nextBool() ? 'PUT' : 'PATCH';
       } else if (selectedEndpoint == '/posts/1') {
         requestMethod = 'DELETE';
       } else {
@@ -239,6 +281,7 @@ class _SniffingPageState extends State<SniffingPage> {
         statusCode: null,
         reasonPhrase: 'Connection Error',
         responseBodyBytes: 0,
+        endTime: DateTime.now(),
       );
       FNICLient.inspectorNotifierList.value.add(result);
       FNICLient.inspectorNotifierList.notifyListeners();
@@ -417,12 +460,12 @@ class FNICLient {
     inspectorNotifierList.notifyListeners();
 
     final response = await http.get(url, headers: headers);
-
+    result.endTime = DateTime.now(); // Tambahkan endTime di sini
     result.statusCode = response.statusCode;
     result.reasonPhrase = response.reasonPhrase;
     result.responseBodyBytes = response.bodyBytes.length;
-
     inspectorNotifierList.notifyListeners();
+
     return response;
   }
 
