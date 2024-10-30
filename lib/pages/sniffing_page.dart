@@ -1,8 +1,99 @@
-import 'dart:async'; // Impor untuk Timer
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_network_inspector/models/inspector_result.dart';
 import 'package:http/http.dart' as http;
+
+class NetworkStatusPopup extends StatelessWidget {
+  final double successRate;
+
+  final int avgResponseTime;
+
+  final int totalDataReceived;
+
+  const NetworkStatusPopup({
+    Key? key,
+    required this.successRate,
+    required this.avgResponseTime,
+    required this.totalDataReceived,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    var mediaQuery = MediaQuery.of(context);
+    double screenWidth = mediaQuery.size.width;
+
+    return Align(
+      alignment: Alignment.bottomCenter,
+      child: Padding(
+        padding:
+            EdgeInsets.only(bottom: 70.0, top: 20.0), // Ubah nilai padding atas
+        child: Container(
+          width: screenWidth * 0.9, // Atur lebar menjadi 90% dari lebar layar
+          decoration: BoxDecoration(
+            color: Color(0xFF15181F).withOpacity(0.9),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Jaringan anda stabil',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  Icon(Icons.check_box, color: Colors.green),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Jaringan stabil dengan ${successRate.toStringAsFixed(1)}% permintaan berhasil',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.show_chart, color: Colors.blue),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Rata-rata waktu respons: ${avgResponseTime} ms',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.save_alt, color: Colors.grey),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Total data yang diterima: ${totalDataReceived} KB',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class SniffingPage extends StatefulWidget {
   const SniffingPage({super.key});
@@ -16,6 +107,7 @@ class _SniffingPageState extends State<SniffingPage> {
   final FNICLient _client = FNICLient();
   final List<InspectorResult> _sniffedData = [];
   Timer? _timer; // Menambahkan Timer
+  String _networkAnalysisSummary = ''; // Menyimpan hasil analisis
 
   @override
   void initState() {
@@ -48,10 +140,23 @@ class _SniffingPageState extends State<SniffingPage> {
       if (isStarted) {
         print("Sniffing started: $isStarted");
         _sniffedData.clear(); // Kosongkan daftar data saat mulai
+        _networkAnalysisSummary = ''; // Hapus analisis lama
         _startRequestLoop(); // Mulai loop permintaan
       } else {
         print("Sniffing stopped: $isStarted");
         _timer?.cancel(); // Hentikan timer saat berhenti
+        // Tampilkan NetworkStatusPopup ketika berhenti
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.transparent, // Agar tampak transparan
+          builder: (BuildContext context) {
+            return NetworkStatusPopup(
+              successRate: 98.5, // Ganti dengan data yang sebenarnya
+              avgResponseTime: 150, // Ganti dengan data yang sebenarnya
+              totalDataReceived: 1024, // Ganti dengan data yang sebenarnya
+            );
+          },
+        );
       }
     });
   }
@@ -67,17 +172,76 @@ class _SniffingPageState extends State<SniffingPage> {
     if (!isStarted) return; // Pastikan sniffing aktif
 
     try {
-      print("Sending request to https://jsonplaceholder.typicode.com/posts");
+      // Daftar endpoint yang bisa dipilih secara acak
+      List<String> endpoints = [
+        '/posts',
+        '/posts/1',
+        '/posts/1/comments',
+        '/comments?postId=1',
+        '/posts', // Untuk POST
+        '/posts/1', // Untuk PUT dan PATCH
+        '/posts/1', // Untuk DELETE
+      ];
 
-      var response = await _client
-          .get(Uri.parse('https://jsonplaceholder.typicode.com/posts'));
+      // Pilih endpoint secara acak
+      String selectedEndpoint = endpoints[Random().nextInt(endpoints.length)];
+
+      // Tentukan metode HTTP berdasarkan endpoint yang dipilih
+      String requestMethod;
+      if (selectedEndpoint == '/posts') {
+        requestMethod = 'GET';
+      } else if (selectedEndpoint == '/posts/1') {
+        requestMethod =
+            Random().nextBool() ? 'PUT' : 'PATCH'; // 50/50 untuk PUT dan PATCH
+      } else if (selectedEndpoint == '/posts/1') {
+        requestMethod = 'DELETE';
+      } else {
+        requestMethod = 'GET';
+      }
+
+      print(
+          "Sending request to https://jsonplaceholder.typicode.com$selectedEndpoint");
+
+      // Kirim permintaan sesuai metode yang ditentukan
+      http.Response response;
+      if (requestMethod == 'POST') {
+        response = await _client.post(
+            Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'),
+            body: {'title': 'New Post', 'body': 'This is a new post.'});
+      } else if (requestMethod == 'PUT' || requestMethod == 'PATCH') {
+        response = await _client.put(
+            Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'),
+            body: {
+              'title': 'Updated Post',
+              'body': 'This post has been updated.'
+            });
+      } else if (requestMethod == 'DELETE') {
+        response = await _client.delete(
+            Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'));
+      } else {
+        response = await _client.get(
+            Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'));
+      }
 
       if (response.statusCode == 200) {
         print("Response status: ${response.statusCode}");
         print("Response body: ${response.body}");
+      } else {
+        print("Error: ${response.statusCode} ${response.reasonPhrase}");
       }
     } catch (e) {
-      print("Error during request: $e");
+      // Menangani kesalahan koneksi
+      print("Connection error: $e");
+      // Mengatur hasil sniffing untuk koneksi yang buruk
+      InspectorResult result = InspectorResult(
+        url: Uri.parse("https://jsonplaceholder.typicode.com"),
+        startTime: DateTime.now(),
+        statusCode: null,
+        reasonPhrase: 'Connection Error',
+        responseBodyBytes: 0,
+      );
+      FNICLient.inspectorNotifierList.value.add(result);
+      FNICLient.inspectorNotifierList.notifyListeners();
     }
   }
 
@@ -161,7 +325,7 @@ class _SniffingPageState extends State<SniffingPage> {
                 _buildTableHeader('No.', noWidth),
                 _buildTableHeader('Time', timeWidth),
                 _buildTableHeader('Source', sourceWidth),
-                _buildTableHeader('Destination', destinationWidth),
+                _buildTableHeader('Path', destinationWidth),
                 _buildTableHeader('Proto.', protoWidth),
                 _buildTableHeader('Length', lengthWidth),
                 _buildTableHeader('Info', infoWidth),
@@ -175,6 +339,14 @@ class _SniffingPageState extends State<SniffingPage> {
                   int index = entry.key + 1;
                   InspectorResult data = entry.value;
 
+                  // Mendapatkan informasi protokol
+                  String protocol =
+                      data.url?.scheme.toUpperCase() ?? '-'; // HTTPS atau HTTP
+
+                  // Menyusun informasi untuk kolom Info
+                  String info =
+                      '${data.reasonPhrase} ${data.statusCode ?? '-'}';
+
                   return Row(
                     children: [
                       _buildTableCell(index.toString(), noWidth, rowHeight),
@@ -184,12 +356,12 @@ class _SniffingPageState extends State<SniffingPage> {
                           data.url?.host ?? '-', sourceWidth, rowHeight),
                       _buildTableCell(
                           data.url?.path ?? '-', destinationWidth, rowHeight),
-                      _buildTableCell(data.statusCode?.toString() ?? '-',
-                          protoWidth, rowHeight),
+                      _buildTableCell(protocol, protoWidth,
+                          rowHeight), // Menampilkan Protokol
                       _buildTableCell(data.responseBodyBytes?.toString() ?? '-',
                           lengthWidth, rowHeight),
                       _buildTableCell(
-                          data.reasonPhrase ?? '-', infoWidth, rowHeight),
+                          info, infoWidth, rowHeight), // Menampilkan Info
                     ],
                   );
                 }).toList(),
@@ -238,13 +410,80 @@ class FNICLient {
   static final ValueNotifier<List<InspectorResult>> inspectorNotifierList =
       ValueNotifier([]);
 
-  Future<http.Response> get(Uri url) async {
+  Future<http.Response> get(Uri url, {Map<String, String>? headers}) async {
     InspectorResult result =
         InspectorResult(url: url, startTime: DateTime.now());
     inspectorNotifierList.value.add(result);
     inspectorNotifierList.notifyListeners();
 
-    final response = await http.get(url);
+    final response = await http.get(url, headers: headers);
+
+    result.statusCode = response.statusCode;
+    result.reasonPhrase = response.reasonPhrase;
+    result.responseBodyBytes = response.bodyBytes.length;
+
+    inspectorNotifierList.notifyListeners();
+    return response;
+  }
+
+  Future<http.Response> post(Uri url,
+      {Map<String, String>? headers, Object? body}) async {
+    InspectorResult result =
+        InspectorResult(url: url, startTime: DateTime.now());
+    inspectorNotifierList.value.add(result);
+    inspectorNotifierList.notifyListeners();
+
+    final response = await http.post(url, headers: headers, body: body);
+
+    result.statusCode = response.statusCode;
+    result.reasonPhrase = response.reasonPhrase;
+    result.responseBodyBytes = response.bodyBytes.length;
+
+    inspectorNotifierList.notifyListeners();
+    return response;
+  }
+
+  Future<http.Response> put(Uri url,
+      {Map<String, String>? headers, Object? body}) async {
+    InspectorResult result =
+        InspectorResult(url: url, startTime: DateTime.now());
+    inspectorNotifierList.value.add(result);
+    inspectorNotifierList.notifyListeners();
+
+    final response = await http.put(url, headers: headers, body: body);
+
+    result.statusCode = response.statusCode;
+    result.reasonPhrase = response.reasonPhrase;
+    result.responseBodyBytes = response.bodyBytes.length;
+
+    inspectorNotifierList.notifyListeners();
+    return response;
+  }
+
+  Future<http.Response> patch(Uri url,
+      {Map<String, String>? headers, Object? body}) async {
+    InspectorResult result =
+        InspectorResult(url: url, startTime: DateTime.now());
+    inspectorNotifierList.value.add(result);
+    inspectorNotifierList.notifyListeners();
+
+    final response = await http.patch(url, headers: headers, body: body);
+
+    result.statusCode = response.statusCode;
+    result.reasonPhrase = response.reasonPhrase;
+    result.responseBodyBytes = response.bodyBytes.length;
+
+    inspectorNotifierList.notifyListeners();
+    return response;
+  }
+
+  Future<http.Response> delete(Uri url, {Map<String, String>? headers}) async {
+    InspectorResult result =
+        InspectorResult(url: url, startTime: DateTime.now());
+    inspectorNotifierList.value.add(result);
+    inspectorNotifierList.notifyListeners();
+
+    final response = await http.delete(url, headers: headers);
 
     result.statusCode = response.statusCode;
     result.reasonPhrase = response.reasonPhrase;
