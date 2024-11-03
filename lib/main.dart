@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:networking_app/pages/speed_test_page.dart';
-import 'package:networking_app/pages/sniffing_page.dart';
-import 'package:networking_app/pages/terminal_page.dart';
-import 'package:networking_app/pages/vpn_page.dart';
-import 'package:networking_app/pages/files_page.dart';
-import 'package:networking_app/pages/details_screen.dart'; // Import DetailsScreen
+import 'package:flutter1/pages/speed_test_page.dart';
+import 'package:flutter1/pages/sniffing_page.dart';
+import 'package:flutter1/pages/terminal_page.dart';
+import 'package:flutter1/pages/vpn_page.dart';
+import 'package:flutter1/pages/files_page.dart';
+import 'package:flutter1/pages/details_screen.dart'; // Import DetailsScreen
 import 'package:permission_handler/permission_handler.dart';
 
 void main() {

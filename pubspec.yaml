@@ -1,4 +1,4 @@
-name: networking_app
+name: flutter1
 description: "A new Flutter project."
 publish_to: 'none'
 version: 0.1.0
@@ -30,6 +30,8 @@ flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
   image_path: "assets/icons/icon.png"
+  adaptive_icon_background: "#ffffff"
+  adaptive_icon_foreground: "assets/icons/icon.png"
 
 flutter:
   uses-material-design: true
