@@ -5,17 +5,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:flutter_network_inspector/models/inspector_result.dart';
 import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 class NetworkStatusPopup extends StatelessWidget {
   final double successRate;
   final int avgResponseTime;
   final int totalDataReceived;
+  final int blockedPackets; // Keep this declaration
+  final int successfulPackets; // Declare this field correctly
 
   const NetworkStatusPopup({
     Key? key,
     required this.successRate,
     required this.avgResponseTime,
     required this.totalDataReceived,
+    required this.blockedPackets, // Keep this in the constructor
+    required this.successfulPackets, // Add this to the constructor
   }) : super(key: key);
 
   @override
@@ -23,10 +29,9 @@ class NetworkStatusPopup extends StatelessWidget {
     var mediaQuery = MediaQuery.of(context);
     double screenWidth = mediaQuery.size.width;
 
-    // Tentukan teks berdasarkan kondisi successRate
-    String networkStatusText = successRate >= 80
-        ? 'Jaringan Anda stabil'
-        : 'Jaringan Anda tidak stabil';
+    String networkStatusText = blockedPackets > 0
+        ? 'Terdapat paket yang diblokir: $blockedPackets'
+        : 'Semua paket berhasil diterima';
 
     return Align(
       alignment: Alignment.bottomCenter,
@@ -55,13 +60,13 @@ class NetworkStatusPopup extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    successRate >= 80 ? Icons.check_box : Icons.error,
-                    color: successRate >= 80 ? Colors.green : Colors.red,
+                    blockedPackets > 0 ? Icons.error : Icons.check_circle,
+                    color: blockedPackets > 0 ? Colors.red : Colors.green,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Jaringan ${successRate >= 80 ? "stabil" : "tidak stabil"} dengan ${successRate.toStringAsFixed(1)}% permintaan berhasil',
+                      'Status Jaringan: ${blockedPackets > 0 ? "Terdapat paket yang diblokir: $blockedPackets" : "Semua paket berhasil diterima"}',
                       style: TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -88,6 +93,32 @@ class NetworkStatusPopup extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Total data yang diterima: ${totalDataReceived} KB',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.block, color: Colors.red),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Total paket yang diblokir: $blockedPackets',
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Jumlah paket yang berhasil: $successfulPackets',
                       style: TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -141,24 +172,34 @@ class _SniffingPageState extends State<SniffingPage> {
   void _calculateNetworkMetrics() {
     if (_sniffedData.isEmpty) return;
 
-    int successfulRequests =
-        _sniffedData.where((result) => result.statusCode == 200).length;
+    // Hitung permintaan yang berhasil
+    int successfulRequests = _sniffedData
+        .where((result) =>
+            result.statusCode != null &&
+            result.statusCode! >= 200 &&
+            result.statusCode! < 300)
+        .length;
+
+    // Hitung permintaan yang "diblokir" atau gagal (kode 400 dan 500)
+    int blockedPackets = _sniffedData
+        .where((result) =>
+            result.statusCode != null &&
+            (result.statusCode! >= 400 && result.statusCode! < 600))
+        .length;
+
+    // Total semua permintaan yang tercatat
     double successRate = (successfulRequests / _sniffedData.length) * 100;
 
     int totalResponseTime = 0;
     int totalDataReceived = 0;
 
+    // Kalkulasi waktu respons rata-rata dan total data yang diterima
     for (var result in _sniffedData) {
       if (result.startTime != null && result.endTime != null) {
         int responseTime =
             result.endTime!.difference(result.startTime!).inMilliseconds;
         totalResponseTime += responseTime;
-        print("Response Time for ${result.url}: $responseTime ms");
-      } else {
-        print("Incomplete timing for ${result.url}");
       }
-
-      // Menambah ukuran data yang diterima dari setiap respons ke total
       totalDataReceived += result.responseBodyBytes ?? 0;
     }
 
@@ -166,7 +207,7 @@ class _SniffingPageState extends State<SniffingPage> {
         ? (totalResponseTime / _sniffedData.length).round()
         : 0;
 
-    // Tampilkan popup dengan hasil perhitungan
+    // Tampilkan hasil metrik di popup
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -176,6 +217,8 @@ class _SniffingPageState extends State<SniffingPage> {
           avgResponseTime: avgResponseTime,
           totalDataReceived:
               (totalDataReceived / 1024).round(), // Konversi ke KB
+          blockedPackets: blockedPackets,
+          successfulPackets: successfulRequests, // Pass this value
         );
       },
     );
@@ -189,7 +232,7 @@ class _SniffingPageState extends State<SniffingPage> {
       if (isStarted) {
         print("Sniffing started: $isStarted");
 
-        // Kosongkan data di `_sniffedData` dan `inspectorNotifierList`
+        // Kosongkan data di _sniffedData dan inspectorNotifierList
         _sniffedData.clear();
         FNICLient.inspectorNotifierList.value = [];
         FNICLient.inspectorNotifierList.notifyListeners();
@@ -224,6 +267,7 @@ class _SniffingPageState extends State<SniffingPage> {
         '/posts', // Untuk POST
         '/posts/1', // Untuk PUT dan PATCH
         '/posts/1', // Untuk DELETE
+        //'/invalid-endpoint',
       ];
 
       // Pilih endpoint secara acak
@@ -288,8 +332,74 @@ class _SniffingPageState extends State<SniffingPage> {
     }
   }
 
-  void _saveSniffedData() {
-    // Implementasi penyimpanan data jika diperlukan
+  void _saveSniffedData() async {
+    try {
+      // Mendapatkan direktori penyimpanan eksternal untuk folder Downloads
+      final directory = await getExternalStorageDirectory();
+      final downloadDirectory = Directory('${directory?.path}/Download');
+      // Membuat folder Download jika belum ada
+      if (!await downloadDirectory.exists()) {
+        await downloadDirectory.create(recursive: true);
+      }
+
+      final filePath = '${downloadDirectory.path}/sniffed_data.txt';
+
+      // Membuat string dari data yang akan disimpan
+      final dataToSave = _sniffedData.map((result) {
+        return '''
+      Start Time: ${formatDateTime(result.startTime)}
+      Status Code: ${result.statusCode ?? '-'}
+      Protocol: ${result.url?.scheme.toUpperCase() ?? '-'}
+      Host: ${result.url?.host ?? '-'}
+      Path: ${result.url?.path ?? '-'}
+      Response Size: ${(result.responseBodyBytes ?? 0) / 1024} KB
+      Message: ${result.reasonPhrase ?? '-'}
+      ''';
+      }).join('\n---\n');
+
+      // Menyimpan data ke dalam file teks
+      final file = File(filePath);
+      await file.writeAsString(dataToSave);
+
+      // Menampilkan notifikasi bahwa data berhasil disimpan
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Data berhasil disimpan di $filePath')),
+      );
+    } catch (e) {
+      // Menampilkan notifikasi jika terjadi error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal menyimpan data: $e')),
+      );
+    }
+  }
+
+  void _shareData() async {
+    try {
+      // Mendapatkan direktori penyimpanan eksternal untuk folder Downloads
+      final directory = await getExternalStorageDirectory();
+      final downloadDirectory = Directory('${directory?.path}/Download');
+      final filePath = '${downloadDirectory.path}/sniffed_data.txt';
+
+      // Memeriksa apakah file ada
+      final file = File(filePath);
+      if (await file.exists()) {
+        // Create an XFile from the file path
+        final xFile = XFile(file.path);
+
+        // Menggunakan Share untuk membagikan file
+        await Share.shareXFiles([xFile], text: 'Data hasil sniffing Anda');
+      } else {
+        // Menampilkan notifikasi jika file tidak ditemukan
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('File tidak ditemukan: $filePath')),
+        );
+      }
+    } catch (e) {
+      // Menampilkan notifikasi jika terjadi error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal membagikan data: $e')),
+      );
+    }
   }
 
   @override
@@ -355,8 +465,17 @@ class _SniffingPageState extends State<SniffingPage> {
                         width: 24,
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: _shareData,
+                      child: SvgPicture.asset(
+                        'assets/icons/share.svg',
+                        height: 24,
+                        width: 24,
+                      ),
+                    ),
                   ],
-                ),
+                )
               ],
             ),
           ),
@@ -383,29 +502,41 @@ class _SniffingPageState extends State<SniffingPage> {
                   InspectorResult data = entry.value;
 
                   // Mendapatkan informasi protokol
-                  String protocol =
-                      data.url?.scheme.toUpperCase() ?? '-'; // HTTPS atau HTTP
+                  String protocol = data.url?.scheme.toUpperCase() ?? '-';
 
                   // Menyusun informasi untuk kolom Info
                   String info =
                       '${data.reasonPhrase} ${data.statusCode ?? '-'}';
 
-                  return Row(
-                    children: [
-                      _buildTableCell(index.toString(), noWidth, rowHeight),
-                      _buildTableCell(data.startTime?.toIso8601String() ?? '-',
-                          timeWidth, rowHeight),
-                      _buildTableCell(
-                          data.url?.host ?? '-', sourceWidth, rowHeight),
-                      _buildTableCell(
-                          data.url?.path ?? '-', destinationWidth, rowHeight),
-                      _buildTableCell(protocol, protoWidth,
-                          rowHeight), // Menampilkan Protokol
-                      _buildTableCell(data.responseBodyBytes?.toString() ?? '-',
-                          lengthWidth, rowHeight),
-                      _buildTableCell(
-                          info, infoWidth, rowHeight), // Menampilkan Info
-                    ],
+                  // Membungkus baris dengan GestureDetector untuk interaksi klik
+                  return GestureDetector(
+                    onTap: () {
+                      Navigator.pushNamed(
+                        context,
+                        '/details',
+                        arguments:
+                            data, // Mengirimkan objek data ke DetailsScreen
+                      );
+                    },
+                    child: Row(
+                      children: [
+                        _buildTableCell(index.toString(), noWidth, rowHeight),
+                        _buildTableCell(
+                            data.startTime?.toIso8601String() ?? '-',
+                            timeWidth,
+                            rowHeight),
+                        _buildTableCell(
+                            data.url?.host ?? '-', sourceWidth, rowHeight),
+                        _buildTableCell(
+                            data.url?.path ?? '-', destinationWidth, rowHeight),
+                        _buildTableCell(protocol, protoWidth, rowHeight),
+                        _buildTableCell(
+                            data.responseBodyBytes?.toString() ?? '-',
+                            lengthWidth,
+                            rowHeight),
+                        _buildTableCell(info, infoWidth, rowHeight),
+                      ],
+                    ),
                   );
                 }).toList(),
               ),
@@ -543,4 +674,9 @@ class FNICLient {
   void close() {
     // Implementasi untuk menutup koneksi jika diperlukan
   }
+}
+
+String formatDateTime(DateTime? dateTime) {
+  if (dateTime == null) return '-';
+  return '${dateTime.hour}:${dateTime.minute}:${dateTime.second}';
 }

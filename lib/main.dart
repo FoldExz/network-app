@@ -5,6 +5,8 @@ import 'package:flutter1/pages/sniffing_page.dart';
 import 'package:flutter1/pages/terminal_page.dart';
 import 'package:flutter1/pages/vpn_page.dart';
 import 'package:flutter1/pages/files_page.dart';
+import 'package:flutter1/pages/details_screen.dart'; // Import DetailsScreen
+import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   runApp(const MainApp());
@@ -26,6 +28,10 @@ class MainApp extends StatelessWidget {
         ),
       ),
       home: const HomePage(),
+      routes: {
+        '/details': (context) =>
+            const DetailsScreen(), // Tambahkan rute untuk DetailsScreen
+      },
     );
   }
 }
@@ -47,6 +53,20 @@ class _HomePageState extends State<HomePage> {
     VPNPage(),
     FileTransferPage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _requestStoragePermission(); // Memanggil fungsi di sini
+  }
+
+  Future<void> _requestStoragePermission() async {
+    if (await Permission.storage.request().isGranted) {
+      // Izin diberikan, Anda dapat melanjutkan dengan logika penyimpanan
+    } else {
+      // Tampilkan pesan atau tangani kasus di mana izin tidak diberikan
+    }
+  }
 
   void _onItemTapped(int index) {
     setState(() {
