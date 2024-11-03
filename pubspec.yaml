@@ -1,4 +1,4 @@
-name: flutter1
+name: networking_app
 description: "A new Flutter project."
 publish_to: 'none'
 version: 0.1.0
@@ -17,11 +17,19 @@ dependencies:
   permission_handler: ^11.3.1
   share_plus: ^10.1.1
   open_file: ^3.5.9
+  speed_test_dart: ^1.0.5+0
+  shared_preferences: ^2.3.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: "^0.14.1"
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icons/icon.png"
 
 flutter:
   uses-material-design: true
