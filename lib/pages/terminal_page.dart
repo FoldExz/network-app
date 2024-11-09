@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:dart_ping/dart_ping.dart'; // Import package dart_ping
 import '../utils/ssh_connection.dart';
+import '../styles/app_color.dart';
+import '../styles/app_styles.dart';
 
 class TerminalPage extends StatelessWidget {
-  // Remove const keyword here
   TerminalPage({super.key});
 
   final _sshConnection = SSHConnection();
@@ -28,7 +30,6 @@ class TerminalPage extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 50),
-                // Search Bar
                 Container(
                   decoration: BoxDecoration(
                     color: const Color(0xFF15181F),
@@ -108,89 +109,216 @@ class TerminalPage extends StatelessWidget {
     );
   }
 
+  Future<bool> _checkHostAvailability(String host) async {
+    final ping = Ping(host, count: 3, timeout: 1); // Timeout dalam detik
+    bool isReachable = false;
+
+    await for (final pingData in ping.stream) {
+      if (pingData.response != null) {
+        isReachable = true;
+        break;
+      }
+    }
+
+    return isReachable;
+  }
+
   void _showPasswordBottomSheet(BuildContext context, String command) {
-    String address = _extractAddress(command);
+    bool _isLoading = false;
+    bool _isError = false;
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E222A),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: _hostController,
-                  decoration: const InputDecoration(
-                    labelText: 'Host Address',
-                    filled: true,
-                    fillColor: Color(0xFF15181F),
-                  ),
-                  style: const TextStyle(color: Colors.white),
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF15181F),
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
                 ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    filled: true,
-                    fillColor: Color(0xFF15181F),
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                const SizedBox(height: 10),
-                TextField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    filled: true,
-                    fillColor: Color(0xFF15181F),
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton(
-                  onPressed: () async {
-                    String host = _hostController.text;
-                    String username = _usernameController.text;
-                    String password = _passwordController.text;
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'New host',
+                          style: const TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context);
+                          },
+                          child: Text(
+                            'Cancel',
+                            style: const TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.normal,
+                              color: Color(0xFF29B06C),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    TextField(
+                      controller: _hostController,
+                      decoration: const InputDecoration(
+                        labelText: 'Host Address',
+                        labelStyle: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF8C91A5),
+                        ),
+                        filled: true,
+                        fillColor: Color(0xFF15181F),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF242834)),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF242834)),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _usernameController,
+                      decoration: const InputDecoration(
+                        labelText: 'Username',
+                        labelStyle: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF8C91A5),
+                        ),
+                        filled: true,
+                        fillColor: Color(0xFF15181F),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF242834)),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF242834)),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        labelText: 'Password',
+                        labelStyle: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF8C91A5),
+                        ),
+                        filled: true,
+                        fillColor: Color(0xFF15181F),
+                        enabledBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF242834)),
+                        ),
+                        focusedBorder: UnderlineInputBorder(
+                          borderSide: BorderSide(color: Color(0xFF242834)),
+                        ),
+                      ),
+                      style: const TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 20),
+                    if (_isLoading)
+                      const LinearProgressIndicator(), // Progress Bar
+                    if (_isError)
+                      const Padding(
+                        padding: EdgeInsets.only(top: 10.0),
+                        child: Text(
+                          "Koneksi gagal",
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontFamily: 'Poppins',
+                          ),
+                        ),
+                      ),
+                    const SizedBox(height: 10),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          setState(() {
+                            _isLoading = true;
+                            _isError = false;
+                          });
 
-                    await _sshConnection.connect(host, username, password);
-                    Navigator.pop(context);
-                    _showTerminalScreen(context);
-                  },
-                  child: const Text("Connect"),
+                          String host = _hostController.text;
+                          String username = _usernameController.text;
+                          String password = _passwordController.text;
+
+                          // Cek apakah host dapat dijangkau
+                          bool isReachable = await _checkHostAvailability(host);
+                          if (!isReachable) {
+                            setState(() {
+                              _isLoading = false;
+                              _isError = true;
+                            });
+                            return; // Jangan lanjutkan jika host tidak bisa dijangkau
+                          }
+
+                          try {
+                            // Mencoba untuk melakukan koneksi SSH
+                            await _sshConnection.connect(
+                                host, username, password);
+
+                            // Jika berhasil, tutup bottom sheet dan buka TerminalScreen
+                            Navigator.pop(context);
+                            _showTerminalScreen(context);
+                          } catch (e) {
+                            // Jika gagal (misalnya Connection Refused), tampilkan pesan kesalahan
+                            setState(() {
+                              _isLoading = false;
+                              _isError = true;
+                            });
+
+                            // Anda bisa memeriksa error lebih lanjut di sini, misalnya Connection Refused
+                            print("Koneksi SSH gagal: $e");
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF343746),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        child: const Text(
+                          "Continue",
+                          style: TextStyle(
+                            fontFamily: 'Poppins',
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFFFFFFF),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         );
       },
     );
   }
 
-  // Fungsi untuk mengekstrak alamat dari perintah
-  String _extractAddress(String command) {
-    // Mengambil alamat dari command
-    RegExp regex = RegExp(r'(?<=@|\s)([\w.-]+)(?::\d+)?');
-    Match? match = regex.firstMatch(command);
-    if (match != null) {
-      return match.group(0) ?? '';
-    }
-    return 'Unknown host';
-  }
-
   void _showTerminalScreen(BuildContext context) {
+    // Make sure to only navigate to the terminal screen if the connection was successful
     Navigator.push(
       context,
       MaterialPageRoute(
