@@ -52,8 +52,7 @@ class TerminalPage extends StatelessWidget {
                             border: InputBorder.none,
                           ),
                           onSubmitted: (command) {
-                            if (command.startsWith("ssh") ||
-                                command.startsWith("telnet")) {
+                            if (command.startsWith("ssh")) {
                               _showPasswordBottomSheet(context, command);
                             }
                           },
@@ -80,11 +79,6 @@ class TerminalPage extends StatelessWidget {
                         CommandItem(
                           command: 'ssh [user@]host[:port]',
                           example: 'ssh user@192.168.1.1',
-                          baseFontSize: baseFontSize,
-                        ),
-                        CommandItem(
-                          command: 'telnet host [port]',
-                          example: 'telnet 192.168.1.1',
                           baseFontSize: baseFontSize,
                         ),
                         CommandItem(
