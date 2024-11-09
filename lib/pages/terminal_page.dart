@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:dart_ping/dart_ping.dart'; // Import package dart_ping
+import 'package:flutter/services.dart';
 import '../utils/ssh_connection.dart';
 import '../styles/app_color.dart';
 import '../styles/app_styles.dart';
@@ -127,6 +128,25 @@ class TerminalPage extends StatelessWidget {
     bool _isLoading = false;
     bool _isError = false;
 
+    // Parsing command to extract username and host address
+    String host = '';
+    String username = '';
+
+    // Format yang diharapkan adalah 'ssh username@host'
+    if (command.startsWith("ssh")) {
+      final regex = RegExp(r"ssh\s+([^\@]+)\@([^\s]+)");
+      final match = regex.firstMatch(command);
+
+      if (match != null) {
+        username = match.group(1) ?? '';
+        host = match.group(2) ?? '';
+      }
+    }
+
+    // Mengisi controller dengan nilai yang terparsing
+    _hostController.text = host;
+    _usernameController.text = username;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -238,17 +258,9 @@ class TerminalPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 20),
                     if (_isLoading)
-                      const LinearProgressIndicator(), // Progress Bar
-                    if (_isError)
-                      const Padding(
-                        padding: EdgeInsets.only(top: 10.0),
-                        child: Text(
-                          "Koneksi gagal",
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontFamily: 'Poppins',
-                          ),
-                        ),
+                      const LinearProgressIndicator(
+                        valueColor:
+                            AlwaysStoppedAnimation<Color>(Color(0xFF29B06C)),
                       ),
                     const SizedBox(height: 10),
                     SizedBox(
@@ -281,6 +293,8 @@ class TerminalPage extends StatelessWidget {
 
                             // Jika berhasil, tutup bottom sheet dan buka TerminalScreen
                             Navigator.pop(context);
+
+                            // **Buka TerminalScreen hanya jika koneksi berhasil**
                             _showTerminalScreen(context);
                           } catch (e) {
                             // Jika gagal (misalnya Connection Refused), tampilkan pesan kesalahan
@@ -289,7 +303,7 @@ class TerminalPage extends StatelessWidget {
                               _isError = true;
                             });
 
-                            // Anda bisa memeriksa error lebih lanjut di sini, misalnya Connection Refused
+                            // Menampilkan error jika koneksi gagal
                             print("Koneksi SSH gagal: $e");
                           }
                         },
@@ -317,18 +331,41 @@ class TerminalPage extends StatelessWidget {
     );
   }
 
-  void _showTerminalScreen(BuildContext context) {
-    // Make sure to only navigate to the terminal screen if the connection was successful
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => TerminalScreen(sshConnection: _sshConnection),
-      ),
-    );
+  void _showTerminalScreen(BuildContext context) async {
+    // Pastikan SSHConnection telah berhasil terkoneksi sebelumnya
+    bool isConnected =
+        _sshConnection.isConnected; // Menggunakan getter isConnected
+
+    if (isConnected) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => TerminalScreen(sshConnection: _sshConnection),
+        ),
+      );
+    } else {
+      // Jika tidak terkoneksi, tampilkan pesan kesalahan atau tidak melakukan apa-apa
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text("Koneksi SSH gagal. Tidak dapat membuka terminal.")),
+      );
+    }
+  }
+
+// Fungsi untuk mengecek status koneksi SSH
+  Future<bool> _checkSSHConnection() async {
+    try {
+      // Cek koneksi SSH
+      bool isReachable = await _sshConnection.isConnected;
+      return isReachable;
+    } catch (e) {
+      // Jika gagal, berarti koneksi tidak berhasil
+      print("Koneksi SSH gagal: $e");
+      return false;
+    }
   }
 }
 
-// Halaman terminal setelah login berhasil
 class TerminalScreen extends StatefulWidget {
   final SSHConnection sshConnection;
 
@@ -340,20 +377,50 @@ class TerminalScreen extends StatefulWidget {
 
 class _TerminalScreenState extends State<TerminalScreen> {
   final TextEditingController _commandController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  final ScrollController _scrollController =
+      ScrollController(); // Tambahkan ScrollController
   String _output = "";
 
-  Future<void> _sendCommand() async {
-    final result =
-        await widget.sshConnection.executeCommand(_commandController.text);
+  // Fungsi untuk mengirimkan command ke SSH
+  Future<void> _sendCommand(String command) async {
+    final result = await widget.sshConnection.executeCommand(command);
     setState(() {
-      _output += '\n\$ ${_commandController.text}\n$result';
+      _output += '\n\$ $command\n$result';
     });
+
+    // Scroll otomatis ke bawah
+    _scrollToBottom();
     _commandController.clear();
+  }
+
+  // Fungsi untuk mengatur scroll ke bawah
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
+  // Fungsi untuk menyembunyikan/memunculkan keyboard
+  void _toggleKeyboard() {
+    if (_focusNode.hasFocus) {
+      _focusNode.unfocus(); // Menyembunyikan keyboard
+    } else {
+      FocusScope.of(context).requestFocus(_focusNode); // Memunculkan keyboard
+    }
   }
 
   @override
   void dispose() {
     widget.sshConnection.close();
+    _focusNode.dispose();
+    _scrollController.dispose(); // Dispose ScrollController
     super.dispose();
   }
 
@@ -369,20 +436,88 @@ class _TerminalScreenState extends State<TerminalScreen> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                child:
-                    Text(_output, style: const TextStyle(color: Colors.green)),
+                controller:
+                    _scrollController, // Pasang ScrollController di sini
+                child: Text(
+                  _output,
+                  style: const TextStyle(
+                    color: Colors.green,
+                    fontFamily:
+                        'Consolas', // Menggunakan font Consolas untuk output
+                  ),
+                ),
               ),
             ),
-            TextField(
-              controller: _commandController,
-              decoration: const InputDecoration(hintText: "Enter command"),
-              onSubmitted: (_) => _sendCommand(),
-            ),
-            ElevatedButton(
-              onPressed: _sendCommand,
-              child: const Text("Send"),
+
+            // Input perintah di terminal
+            Padding(
+              padding: const EdgeInsets.only(bottom: 20.0),
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      const Text(
+                        '\$ ',
+                        style: TextStyle(
+                          color: Colors.green,
+                          fontFamily: 'Consolas',
+                        ),
+                      ),
+                      Expanded(
+                        child: TextField(
+                          controller: _commandController,
+                          focusNode: _focusNode,
+                          style: const TextStyle(
+                              color: Colors.white, fontFamily: 'Consolas'),
+                          decoration: const InputDecoration(
+                            hintText: 'Enter command',
+                            border: InputBorder.none,
+                            hintStyle: TextStyle(color: Colors.grey),
+                          ),
+                          onSubmitted: (command) {
+                            _sendCommand(command);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  // Row untuk shortcut keyboard tanpa kotak
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildShortcutText('Ctrl', () {
+                        _commandController.text += "Ctrl ";
+                      }),
+                      _buildShortcutText('Tab', () {
+                        _commandController.text += "Tab ";
+                      }),
+                      _buildShortcutText('Esc', () {
+                        _commandController.text += "Esc ";
+                      }),
+                      IconButton(
+                        icon: const Icon(Icons.keyboard, color: Colors.white),
+                        onPressed: _toggleKeyboard,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShortcutText(String label, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Text(
+        label,
+        style: const TextStyle(
+          fontSize: 16,
+          fontFamily: 'Arial Rounded MT Bold',
+          color: Colors.white,
         ),
       ),
     );
