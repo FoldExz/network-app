@@ -1,7 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'add_host_bottom_sheet.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dartssh2/dartssh2.dart';
+import 'sftp_connection.dart';
 
 // Central list to store all available host servers
-List<String> hostServers = [];
+List<Map<String, String>> hostServers = [];
 
 class FileTransferPage extends StatefulWidget {
   const FileTransferPage({super.key});
@@ -11,6 +17,24 @@ class FileTransferPage extends StatefulWidget {
 }
 
 class _FileTransferPageState extends State<FileTransferPage> {
+  @override
+  void initState() {
+    super.initState();
+    _loadHostsFromPreferences(); // Memuat host saat halaman dimuat
+  }
+
+  Future<void> _loadHostsFromPreferences() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    List<String>? savedHosts = prefs.getStringList('hostServers');
+    if (savedHosts != null) {
+      setState(() {
+        hostServers = savedHosts
+            .map((hostJson) => Map<String, String>.from(jsonDecode(hostJson)))
+            .toList();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
@@ -97,7 +121,7 @@ class HostPage extends StatefulWidget {
 }
 
 class _HostPageState extends State<HostPage> {
-  late List<String> servers;
+  late List<Map<String, String>> servers;
 
   @override
   void initState() {
@@ -145,195 +169,46 @@ class _HostPageState extends State<HostPage> {
   Widget _buildAddNewHost(BuildContext context) {
     return FloatingActionButton(
       onPressed: () {
-        _showAddNewHostBottomSheet(context);
+        showAddNewHostBottomSheet(context);
       },
       backgroundColor: Colors.green,
       child: const Icon(Icons.add, size: 40),
     );
   }
 
-  Widget _buildHostTile(String server) {
+  Widget _buildHostTile(Map<String, String> server) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
         leading: Icon(Icons.cloud, color: Colors.blue),
-        title: Text(server),
-        subtitle: const Text('ssh, user1'),
-        onTap: () {
-          // Add your action here
+        title: Text(server['name'] ?? 'Unknown'),
+        subtitle: Text('${server['username']}, ${server['hostname']}'),
+        onTap: () async {
+          // Mengambil detail dari server
+          final String hostname = server['hostname'] ?? '';
+          final String username = server['username'] ?? '';
+          final String password =
+              server['password'] ?? ''; // Pastikan password ada di map
+
+          try {
+            // Memanggil fungsi untuk menghubungkan ke server SSH
+            // await connectToSftpServer(hostname, username, password);
+
+            // Jika Anda ingin menampilkan daftar file, tambahkan logika di sini
+            // Misalnya: tampilkan file setelah berhasil terhubung
+          } catch (e) {
+            // Tampilkan pesan kesalahan jika terjadi error
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: Text("Error"),
+                content: Text("Gagal terhubung ke server: $e"),
+              ),
+            );
+          }
         },
       ),
-    );
-  }
-
-  void _showAddNewHostBottomSheet(BuildContext context) {
-    String name = '';
-    String hostname = '';
-    String port = '';
-    String username = '';
-    String password = '';
-    String key = '';
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (BuildContext context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context)
-                .viewInsets
-                .bottom, // Sesuaikan dengan keyboard
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: const BoxDecoration(
-              color: Color(0xFF1E222A),
-              borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-            ),
-            child: StatefulBuilder(
-              builder: (context, setState) {
-                return SingleChildScrollView(
-                  // Wrap the form with SingleChildScrollView
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          const Text(
-                            "Host Baru",
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontSize: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () => Navigator.pop(context),
-                            child: const Text(
-                              "Batal",
-                              style: TextStyle(
-                                fontFamily: 'Poppins',
-                                fontSize: 16,
-                                color: Colors.green,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Form fields
-                      TextField(
-                        onChanged: (value) => name = value,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Name',
-                          labelStyle: const TextStyle(color: Colors.white),
-                          filled: true,
-                          fillColor: const Color(0xFF15181F),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        onChanged: (value) => hostname = value,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Hostname / IP Address',
-                          labelStyle: const TextStyle(color: Colors.white),
-                          filled: true,
-                          fillColor: const Color(0xFF15181F),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        onChanged: (value) => port = value,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Port',
-                          labelStyle: const TextStyle(color: Colors.white),
-                          filled: true,
-                          fillColor: const Color(0xFF15181F),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        onChanged: (value) => username = value,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          labelStyle: const TextStyle(color: Colors.white),
-                          filled: true,
-                          fillColor: const Color(0xFF15181F),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      PasswordField(
-                        onChanged: (value) => password = value,
-                      ),
-                      const SizedBox(height: 12),
-                      TextField(
-                        onChanged: (value) => key = value,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: InputDecoration(
-                          labelText: 'Key',
-                          labelStyle: const TextStyle(color: Colors.white),
-                          filled: true,
-                          fillColor: const Color(0xFF15181F),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: BorderSide.none,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      ElevatedButton(
-                        onPressed: () {
-                          // Tambahkan server baru ke daftar global
-                          setState(() {
-                            hostServers.add(name);
-                          });
-                          Navigator.pop(context);
-                        },
-                        style: ElevatedButton.styleFrom(
-                          minimumSize: const Size(double.infinity, 50),
-                          backgroundColor: Colors.green,
-                        ),
-                        child: const Text(
-                          "Lanjut",
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontSize: 18,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        );
-      },
     );
   }
 }

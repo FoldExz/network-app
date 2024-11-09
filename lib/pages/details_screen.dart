@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_network_inspector/models/inspector_result.dart';
-import 'package:flutter_network_inspector/utils/utils.dart';
 
 class DetailsScreen extends StatelessWidget {
   const DetailsScreen({super.key});

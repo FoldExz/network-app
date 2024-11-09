@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import '../utils/ssh_connection.dart';
 
 class TerminalPage extends StatelessWidget {
-  const TerminalPage({super.key});
+  // Remove const keyword here
+  TerminalPage({super.key});
+
+  final _sshConnection = SSHConnection();
+  final TextEditingController _hostController = TextEditingController();
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -107,12 +114,8 @@ class TerminalPage extends StatelessWidget {
     );
   }
 
-  // Fungsi untuk menampilkan Modal Bottom Sheet
   void _showPasswordBottomSheet(BuildContext context, String command) {
     String address = _extractAddress(command);
-    String commandType = command.startsWith("ssh")
-        ? "SSH"
-        : "Telnet"; // Menentukan jenis perintah
 
     showModalBottomSheet(
       context: context,
@@ -130,65 +133,49 @@ class TerminalPage extends StatelessWidget {
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      commandType, // Menampilkan jenis perintah (SSH/Telnet)
-                      style: const TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 20,
-                        color: Colors.white,
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () => Navigator.pop(context),
-                      child: const Text(
-                        "Cancel",
-                        style: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontSize: 16,
-                          color: Colors.green,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Ganti teks sesuai input user
-                Text(
-                  "Enter the password for $address",
-                  style: const TextStyle(
-                    fontFamily: 'Poppins',
-                    fontSize: 16,
-                    color: Colors.white,
+                TextField(
+                  controller: _hostController,
+                  decoration: const InputDecoration(
+                    labelText: 'Host Address',
+                    filled: true,
+                    fillColor: Color(0xFF15181F),
                   ),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    filled: true,
+                    fillColor: Color(0xFF15181F),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _passwordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Password',
+                    filled: true,
+                    fillColor: Color(0xFF15181F),
+                  ),
+                  style: const TextStyle(color: Colors.white),
                 ),
                 const SizedBox(height: 20),
-                // TextField Password
-                PasswordField(),
-                const SizedBox(height: 20),
-                // Button Continue
                 ElevatedButton(
-                  onPressed: () {
-                    // Aksi ketika tombol ditekan
+                  onPressed: () async {
+                    String host = _hostController.text;
+                    String username = _usernameController.text;
+                    String password = _passwordController.text;
+
+                    await _sshConnection.connect(host, username, password);
                     Navigator.pop(context);
                     _showTerminalScreen(context);
                   },
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    backgroundColor: Colors.green,
-                  ),
-                  child: const Text(
-                    "Continue",
-                    style: TextStyle(
-                      fontFamily: 'Poppins',
-                      fontSize: 18,
-                      color: Colors.white,
-                    ),
-                  ),
+                  child: const Text("Connect"),
                 ),
               ],
             ),
@@ -209,50 +196,71 @@ class TerminalPage extends StatelessWidget {
     return 'Unknown host';
   }
 
-  // Fungsi untuk menampilkan layar terminal setelah login berhasil
   void _showTerminalScreen(BuildContext context) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const TerminalScreen(),
+        builder: (context) => TerminalScreen(sshConnection: _sshConnection),
       ),
     );
   }
 }
 
 // Halaman terminal setelah login berhasil
-class TerminalScreen extends StatelessWidget {
-  const TerminalScreen({super.key});
+class TerminalScreen extends StatefulWidget {
+  final SSHConnection sshConnection;
+
+  const TerminalScreen({super.key, required this.sshConnection});
+
+  @override
+  _TerminalScreenState createState() => _TerminalScreenState();
+}
+
+class _TerminalScreenState extends State<TerminalScreen> {
+  final TextEditingController _commandController = TextEditingController();
+  String _output = "";
+
+  Future<void> _sendCommand() async {
+    final result =
+        await widget.sshConnection.executeCommand(_commandController.text);
+    setState(() {
+      _output += '\n\$ ${_commandController.text}\n$result';
+    });
+    _commandController.clear();
+  }
+
+  @override
+  void dispose() {
+    widget.sshConnection.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E222A),
-        title: const Text(
-          "Local Terminal",
-          style: TextStyle(
-            fontFamily: 'Poppins',
-            fontSize: 18,
-            color: Colors.white,
-          ),
-        ),
+        title: const Text("SSH Terminal"),
       ),
-      body: Container(
-        color: const Color(0xFF15181F),
-        padding: const EdgeInsets.all(16),
-        child: const Text(
-          """
-Microsoft Windows [Version 10.0.22631.4169]
-(c) Microsoft Corporation. All rights reserved.
-
-foldexz@FOLDEXZ C:\\Users\\FoldExz>
-          """,
-          style: TextStyle(
-            fontFamily: 'CONSOLA',
-            fontSize: 18,
-            color: Colors.green,
-          ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child:
+                    Text(_output, style: const TextStyle(color: Colors.green)),
+              ),
+            ),
+            TextField(
+              controller: _commandController,
+              decoration: const InputDecoration(hintText: "Enter command"),
+              onSubmitted: (_) => _sendCommand(),
+            ),
+            ElevatedButton(
+              onPressed: _sendCommand,
+              child: const Text("Send"),
+            ),
+          ],
         ),
       ),
     );

@@ -7,6 +7,8 @@ import 'package:flutter_network_inspector/models/inspector_result.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import '../utils/sniffing_helper.dart';
+import '../utils/network_check.dart';
 
 class NetworkStatusPopup extends StatelessWidget {
   final double successRate;
@@ -144,7 +146,6 @@ class _SniffingPageState extends State<SniffingPage> {
   final FNICLient _client = FNICLient();
   final List<InspectorResult> _sniffedData = [];
   Timer? _timer; // Menambahkan Timer
-  String _networkAnalysisSummary = ''; // Menyimpan hasil analisis
 
   @override
   void initState() {
@@ -234,10 +235,10 @@ class _SniffingPageState extends State<SniffingPage> {
 
         // Kosongkan data di _sniffedData dan inspectorNotifierList
         _sniffedData.clear();
-        FNICLient.inspectorNotifierList.value = [];
-        FNICLient.inspectorNotifierList.notifyListeners();
 
-        _networkAnalysisSummary = '';
+        // Atur inspectorNotifierList.value menjadi list kosong, memicu notifyListeners secara otomatis
+        FNICLient.inspectorNotifierList.value = [];
+
         _startRequestLoop();
       } else {
         print("Sniffing stopped: $isStarted");
@@ -248,14 +249,38 @@ class _SniffingPageState extends State<SniffingPage> {
   }
 
   void _startRequestLoop() {
-    // Mengatur timer untuk mengirimkan permintaan setiap 2 detik
-    _timer = Timer.periodic(const Duration(seconds: 2), (timer) async {
+    // Mengatur timer untuk mengirimkan permintaan setiap 0.5 detik
+    _timer = Timer.periodic(const Duration(milliseconds: 500), (timer) async {
       await _makeRequest();
     });
   }
 
   Future<void> _makeRequest() async {
     if (!isStarted) return; // Pastikan sniffing aktif
+
+    // Pengecekan koneksi internet menggunakan fungsi checkInternetConnection
+    bool hasInternet = await NetworkCheck.isInternetAvailable();
+    if (!hasInternet) {
+      print("Tidak ada koneksi internet.");
+
+      // Mengatur hasil sniffing untuk koneksi yang buruk
+      InspectorResult result = InspectorResult(
+        url: Uri.parse("https://jsonplaceholder.typicode.com"),
+        startTime: DateTime.now(),
+        statusCode: null,
+        reasonPhrase: 'No Internet Connection',
+        responseBodyBytes: 0,
+        endTime: DateTime.now(),
+      );
+
+      // Tambahkan hasil ke inspectorNotifierList untuk memicu notifyListeners
+      final updatedList =
+          List<InspectorResult>.from(FNICLient.inspectorNotifierList.value);
+      updatedList.add(result);
+      FNICLient.inspectorNotifierList.value = updatedList;
+
+      return;
+    }
 
     try {
       // Daftar endpoint yang bisa dipilih secara acak
@@ -267,7 +292,6 @@ class _SniffingPageState extends State<SniffingPage> {
         '/posts', // Untuk POST
         '/posts/1', // Untuk PUT dan PATCH
         '/posts/1', // Untuk DELETE
-        //'/invalid-endpoint',
       ];
 
       // Pilih endpoint secara acak
@@ -292,21 +316,25 @@ class _SniffingPageState extends State<SniffingPage> {
       http.Response response;
       if (requestMethod == 'POST') {
         response = await _client.post(
-            Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'),
-            body: {'title': 'New Post', 'body': 'This is a new post.'});
+          Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'),
+          body: {'title': 'New Post', 'body': 'This is a new post.'},
+        );
       } else if (requestMethod == 'PUT' || requestMethod == 'PATCH') {
         response = await _client.put(
-            Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'),
-            body: {
-              'title': 'Updated Post',
-              'body': 'This post has been updated.'
-            });
+          Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'),
+          body: {
+            'title': 'Updated Post',
+            'body': 'This post has been updated.'
+          },
+        );
       } else if (requestMethod == 'DELETE') {
         response = await _client.delete(
-            Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'));
+          Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'),
+        );
       } else {
         response = await _client.get(
-            Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'));
+          Uri.parse('https://jsonplaceholder.typicode.com$selectedEndpoint'),
+        );
       }
 
       if (response.statusCode == 200) {
@@ -316,8 +344,8 @@ class _SniffingPageState extends State<SniffingPage> {
         print("Error: ${response.statusCode} ${response.reasonPhrase}");
       }
     } catch (e) {
-      // Menangani kesalahan koneksi
       print("Connection error: $e");
+
       // Mengatur hasil sniffing untuk koneksi yang buruk
       InspectorResult result = InspectorResult(
         url: Uri.parse("https://jsonplaceholder.typicode.com"),
@@ -327,8 +355,12 @@ class _SniffingPageState extends State<SniffingPage> {
         responseBodyBytes: 0,
         endTime: DateTime.now(),
       );
-      FNICLient.inspectorNotifierList.value.add(result);
-      FNICLient.inspectorNotifierList.notifyListeners();
+
+      // Tambahkan hasil ke inspectorNotifierList untuk memicu notifyListeners
+      final updatedList =
+          List<InspectorResult>.from(FNICLient.inspectorNotifierList.value);
+      updatedList.add(result);
+      FNICLient.inspectorNotifierList.value = updatedList;
     }
   }
 
@@ -577,102 +609,6 @@ class _SniffingPageState extends State<SniffingPage> {
         overflow: TextOverflow.ellipsis,
       ),
     );
-  }
-}
-
-class FNICLient {
-  static final ValueNotifier<List<InspectorResult>> inspectorNotifierList =
-      ValueNotifier([]);
-
-  Future<http.Response> get(Uri url, {Map<String, String>? headers}) async {
-    InspectorResult result =
-        InspectorResult(url: url, startTime: DateTime.now());
-    inspectorNotifierList.value.add(result);
-    inspectorNotifierList.notifyListeners();
-
-    final response = await http.get(url, headers: headers);
-    result.endTime = DateTime.now(); // Tambahkan endTime di sini
-    result.statusCode = response.statusCode;
-    result.reasonPhrase = response.reasonPhrase;
-    result.responseBodyBytes = response.bodyBytes.length;
-    inspectorNotifierList.notifyListeners();
-
-    return response;
-  }
-
-  Future<http.Response> post(Uri url,
-      {Map<String, String>? headers, Object? body}) async {
-    InspectorResult result =
-        InspectorResult(url: url, startTime: DateTime.now());
-    inspectorNotifierList.value.add(result);
-    inspectorNotifierList.notifyListeners();
-
-    final response = await http.post(url, headers: headers, body: body);
-
-    result.statusCode = response.statusCode;
-    result.reasonPhrase = response.reasonPhrase;
-    result.responseBodyBytes = response.bodyBytes.length;
-
-    inspectorNotifierList.notifyListeners();
-    return response;
-  }
-
-  Future<http.Response> put(Uri url,
-      {Map<String, String>? headers, Object? body}) async {
-    InspectorResult result =
-        InspectorResult(url: url, startTime: DateTime.now());
-    inspectorNotifierList.value.add(result);
-    inspectorNotifierList.notifyListeners();
-
-    final response = await http.put(url, headers: headers, body: body);
-
-    result.statusCode = response.statusCode;
-    result.reasonPhrase = response.reasonPhrase;
-    result.responseBodyBytes = response.bodyBytes.length;
-
-    inspectorNotifierList.notifyListeners();
-    return response;
-  }
-
-  Future<http.Response> patch(Uri url,
-      {Map<String, String>? headers, Object? body}) async {
-    InspectorResult result =
-        InspectorResult(url: url, startTime: DateTime.now());
-    inspectorNotifierList.value.add(result);
-    inspectorNotifierList.notifyListeners();
-
-    final response = await http.patch(url, headers: headers, body: body);
-
-    result.statusCode = response.statusCode;
-    result.reasonPhrase = response.reasonPhrase;
-    result.responseBodyBytes = response.bodyBytes.length;
-
-    inspectorNotifierList.notifyListeners();
-    return response;
-  }
-
-  Future<http.Response> delete(Uri url, {Map<String, String>? headers}) async {
-    InspectorResult result =
-        InspectorResult(url: url, startTime: DateTime.now());
-    inspectorNotifierList.value.add(result);
-    inspectorNotifierList.notifyListeners();
-
-    final response = await http.delete(url, headers: headers);
-
-    result.statusCode = response.statusCode;
-    result.reasonPhrase = response.reasonPhrase;
-    result.responseBodyBytes = response.bodyBytes.length;
-
-    inspectorNotifierList.notifyListeners();
-    return response;
-  }
-
-  void setEnableLogging(bool enable) {
-    // Implementasi untuk mengatur logging
-  }
-
-  void close() {
-    // Implementasi untuk menutup koneksi jika diperlukan
   }
 }
 

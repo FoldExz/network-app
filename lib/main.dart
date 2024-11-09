@@ -10,7 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MainApp());
+  runApp(MainApp()); // Remove `const` here
 }
 
 class MainApp extends StatelessWidget {
@@ -30,8 +30,7 @@ class MainApp extends StatelessWidget {
       ),
       home: const HomePage(),
       routes: {
-        '/details': (context) =>
-            const DetailsScreen(), // Tambahkan rute untuk DetailsScreen
+        '/details': (context) => DetailsScreen(), // Remove `const` here
       },
     );
   }
@@ -47,7 +46,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   int _selectedIndex = 0;
 
-  static const List<Widget> _pages = <Widget>[
+  // Remove `const` from the `_pages` list because it contains non-constant widget instances.
+  static final List<Widget> _pages = <Widget>[
     SpeedTestPage(),
     SniffingPage(),
     TerminalPage(),
