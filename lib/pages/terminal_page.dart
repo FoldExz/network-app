@@ -33,22 +33,23 @@ class TerminalPage extends StatelessWidget {
                 const SizedBox(height: 50),
                 Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF15181F),
+                    color: AppColors.darkGray,
                     borderRadius: BorderRadius.circular(1000),
                   ),
                   padding:
                       const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                   child: Row(
                     children: [
-                      const Icon(Icons.search, color: Colors.white, size: 20),
+                      const Icon(Icons.search,
+                          color: AppColors.white, size: 20),
                       const SizedBox(width: 10),
                       Expanded(
                         child: TextField(
-                          style: const TextStyle(color: Colors.white),
+                          style: const TextStyle(color: AppColors.white),
                           decoration: InputDecoration(
                             hintText: 'Search / Type a command',
                             hintStyle: TextStyle(
-                              color: const Color(0xFF515257),
+                              color: AppColors.mediumGray,
                               fontSize: baseFontSize * 0.9,
                             ),
                             border: InputBorder.none,
@@ -68,7 +69,7 @@ class TerminalPage extends StatelessWidget {
                   'Suggestions',
                   style: TextStyle(
                     fontSize: baseFontSize,
-                    color: Colors.white,
+                    color: AppColors.white,
                     fontFamily: 'Poppins',
                   ),
                 ),
@@ -126,7 +127,8 @@ class TerminalPage extends StatelessWidget {
 
   void _showPasswordBottomSheet(BuildContext context, String command) {
     bool _isLoading = false;
-    bool _isError = false;
+    // ignore: unused_local_variable
+    bool isError = false;
 
     // Parsing command to extract username and host address
     String host = '';
@@ -160,7 +162,7 @@ class TerminalPage extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(16),
                 decoration: const BoxDecoration(
-                  color: Color(0xFF15181F),
+                  color: AppColors.darkGray,
                   borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
                 ),
                 child: Column(
@@ -174,7 +176,7 @@ class TerminalPage extends StatelessWidget {
                           style: const TextStyle(
                             fontFamily: 'Poppins',
                             fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            color: AppColors.white,
                           ),
                         ),
                         GestureDetector(
@@ -186,7 +188,7 @@ class TerminalPage extends StatelessWidget {
                             style: const TextStyle(
                               fontFamily: 'Poppins',
                               fontWeight: FontWeight.normal,
-                              color: Color(0xFF29B06C),
+                              color: AppColors.green,
                             ),
                           ),
                         ),
@@ -269,7 +271,7 @@ class TerminalPage extends StatelessWidget {
                         onPressed: () async {
                           setState(() {
                             _isLoading = true;
-                            _isError = false;
+                            isError = false;
                           });
 
                           String host = _hostController.text;
@@ -281,7 +283,7 @@ class TerminalPage extends StatelessWidget {
                           if (!isReachable) {
                             setState(() {
                               _isLoading = false;
-                              _isError = true;
+                              isError = true;
                             });
                             return; // Jangan lanjutkan jika host tidak bisa dijangkau
                           }
@@ -300,7 +302,7 @@ class TerminalPage extends StatelessWidget {
                             // Jika gagal (misalnya Connection Refused), tampilkan pesan kesalahan
                             setState(() {
                               _isLoading = false;
-                              _isError = true;
+                              isError = true;
                             });
 
                             // Menampilkan error jika koneksi gagal

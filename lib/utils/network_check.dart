@@ -24,6 +24,7 @@ class NetworkCheck {
   // Memantau perubahan status jaringan dan internet secara real-time
   static Stream<bool> get internetStatusStream async* {
     yield await isInternetAvailable();
+    // ignore: unused_local_variable
     await for (var status in Connectivity().onConnectivityChanged) {
       yield await isInternetAvailable();
     }

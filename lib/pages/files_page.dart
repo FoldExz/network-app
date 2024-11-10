@@ -2,8 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:dartssh2/dartssh2.dart';
-import 'sftp_connection.dart';
 import '../utils/ssh_connection.dart';
 import 'dir_screen.dart';
 

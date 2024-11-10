@@ -23,4 +23,5 @@ class AppColors {
   static const Color deepRed = Color(0xFFD8275A);
   static const Color slateBlue = Color(0xFF5B6289);
   static const Color brightGreen = Color(0xFF1CB167);
+  static const Color green = Color(0xFF29B06C);
 }
