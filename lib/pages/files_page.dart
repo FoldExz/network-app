@@ -302,6 +302,7 @@ Future<void> _loadHostsFromPreferences() async {
 }
 
 // Fungsi untuk menampilkan bottom sheet untuk menambahkan host baru
+// Fungsi untuk menampilkan bottom sheet untuk menambahkan host baru
 void addHostBottomSheet(BuildContext context, Function refreshHosts) {
   String name = '';
   String hostname = '';
@@ -319,7 +320,8 @@ void addHostBottomSheet(BuildContext context, Function refreshHosts) {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(
-            color: Color(0xFF1E222A),
+            color: Color(
+                0xFF15181F), // Mengubah warna latar belakang menjadi #15181F
             borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
           ),
           child: StatefulBuilder(
@@ -384,7 +386,8 @@ void addHostBottomSheet(BuildContext context, Function refreshHosts) {
                       },
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: Colors.green,
+                        backgroundColor: const Color(
+                            0xFF343746), // Mengubah warna tombol menjadi #343746
                       ),
                       child: const Text("Tambah",
                           style: TextStyle(fontSize: 18, color: Colors.white)),
@@ -425,7 +428,8 @@ void modifyHostBottomSheet(
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(
-            color: Color(0xFF1E222A),
+            color: Color(
+                0xFF15181F), // Mengubah warna latar belakang menjadi #15181F
             borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
           ),
           child: StatefulBuilder(
@@ -452,9 +456,6 @@ void modifyHostBottomSheet(
                                 });
                                 await _saveHostsToPreferences();
                                 Navigator.pop(context);
-
-                                // Panggil _refreshHosts untuk memastikan UI terupdate
-                                // await _refreshHosts();
                               },
                               child: const Text(
                                 "Hapus",
@@ -517,7 +518,8 @@ void modifyHostBottomSheet(
                       },
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: Colors.green,
+                        backgroundColor: const Color(
+                            0xFF343746), // Mengubah warna tombol menjadi #343746
                       ),
                       child: const Text("Simpan",
                           style: TextStyle(fontSize: 18, color: Colors.white)),
