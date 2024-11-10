@@ -68,71 +68,6 @@ class _FileTransferPageState extends State<FileTransferPage> {
   }
 }
 
-class PasswordField extends StatefulWidget {
-  final Function(String) onChanged;
-  final String initialValue; // Menambahkan parameter initialValue
-
-  const PasswordField({
-    super.key,
-    required this.onChanged,
-    this.initialValue =
-        '', // Default menjadi string kosong jika tidak diberikan
-  });
-
-  @override
-  _PasswordFieldState createState() => _PasswordFieldState();
-}
-
-class _PasswordFieldState extends State<PasswordField> {
-  bool _isObscured = true;
-  late TextEditingController _controller;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(
-        text:
-            widget.initialValue); // Inisialisasi controller dengan initialValue
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: _controller, // Menggunakan controller di sini
-      obscureText: _isObscured,
-      onChanged: widget.onChanged,
-      style: const TextStyle(color: Colors.white),
-      decoration: InputDecoration(
-        labelText: 'Password',
-        labelStyle: const TextStyle(color: Colors.white),
-        suffixIcon: IconButton(
-          icon: Icon(
-            _isObscured ? Icons.visibility : Icons.visibility_off,
-            color: Colors.white,
-          ),
-          onPressed: () {
-            setState(() {
-              _isObscured = !_isObscured;
-            });
-          },
-        ),
-        filled: true,
-        fillColor: const Color(0xFF15181F),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
-        ),
-      ),
-    );
-  }
-}
-
 class HostPage extends StatefulWidget {
   const HostPage({super.key});
 
@@ -151,7 +86,7 @@ class _HostPageState extends State<HostPage> {
   }
 
   // Fungsi untuk memuat ulang daftar host (sudah terdefinisi di _HostPageState)
-  Future<void> _refreshHosts() async {
+  Future<void> refreshHosts() async {
     await _loadHostsFromPreferences();
     setState(() {
       servers = hostServers; // Perbarui tampilan dengan data terbaru
@@ -202,7 +137,7 @@ class _HostPageState extends State<HostPage> {
             const SizedBox(height: 20),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: _refreshHosts, // Memanggil fungsi refresh
+                onRefresh: refreshHosts, // Memanggil fungsi refresh
                 child: ListView.builder(
                   itemCount: servers.isEmpty
                       ? 1
@@ -247,15 +182,14 @@ class _HostPageState extends State<HostPage> {
   Widget _buildAddNewHost(BuildContext context) {
     return FloatingActionButton(
       onPressed: () {
-        addHostBottomSheet(
-            context, _refreshHosts); // Pass _refreshHosts as a callback
+        addHostBottomSheet(context, refreshHosts);
       },
       backgroundColor: Colors.green,
       child: const Icon(Icons.add, size: 40),
     );
   }
 
-  // Modified _buildHostTile to call modifyHostBottomSheet for details or edits
+  // Fungsi untuk membangun tampilan tiap host dalam list
   Widget _buildHostTile(Map<String, String> server, int index) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -265,10 +199,74 @@ class _HostPageState extends State<HostPage> {
         title: Text(server['name'] ?? 'Unknown'),
         subtitle: Text('${server['username']}, ${server['hostname']}'),
         onLongPress: () {
-          modifyHostBottomSheet(
-              context, server, index); // Edit or modify existing host
+          modifyHostBottomSheet(context, server, index, refreshHosts);
         },
       ),
+    );
+  }
+
+  Widget buildHostList(BuildContext context) {
+    return FutureBuilder(
+      future: _loadHostsFromPreferences(), // Memuat data awal
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          // Menampilkan loading spinner saat data sedang dimuat
+          return Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(child: Text('Error: ${snapshot.error}'));
+        }
+
+        // Memastikan data sudah tersedia
+        if (!snapshot.hasData || hostServers.isEmpty) {
+          return Center(child: Text("Belum ada host tersedia"));
+        }
+
+        return ListView.builder(
+          itemCount: hostServers.length,
+          itemBuilder: (context, index) {
+            final host = hostServers[index];
+            return Card(
+              margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12)),
+              child: ListTile(
+                leading: Icon(Icons.cloud, color: Colors.blue),
+                title: Text(host['name'] ?? 'Unknown'),
+                subtitle: Text('${host['username']}, ${host['hostname']}'),
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (BuildContext context) {
+                    return AlertDialog(
+                      title: Text("Detail Host"),
+                      content: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text("Name: ${host['name']}"),
+                          Text("Hostname: ${host['hostname']}"),
+                          Text("Port: ${host['port']}"),
+                          Text("Username: ${host['username']}"),
+                          Text("Password: ${host['password']}"),
+                        ],
+                      ),
+                      actions: [
+                        TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text("Tutup")),
+                      ],
+                    );
+                  },
+                ),
+                onLongPress: () {
+                  modifyHostBottomSheet(context, host, index, refreshHosts);
+                },
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
@@ -403,8 +401,8 @@ void addHostBottomSheet(BuildContext context, Function refreshHosts) {
   );
 }
 
-void modifyHostBottomSheet(
-    BuildContext context, Map<String, String> host, int index) {
+void modifyHostBottomSheet(BuildContext context, Map<String, String> host,
+    int index, Function refreshHosts) {
   // Cek apakah hostServers memiliki index yang valid
   if (index < 0 || index >= hostServers.length) {
     // Keluarkan pesan error atau return jika index tidak valid
@@ -428,8 +426,7 @@ void modifyHostBottomSheet(
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(
-            color: Color(
-                0xFF15181F), // Mengubah warna latar belakang menjadi #15181F
+            color: Color(0xFF15181F),
             borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
           ),
           child: StatefulBuilder(
@@ -448,14 +445,14 @@ void modifyHostBottomSheet(
                         ),
                         Row(
                           children: [
-                            // Tombol Hapus di sebelah kiri tombol Batal
                             GestureDetector(
                               onTap: () async {
                                 setState(() {
-                                  hostServers.removeAt(index);
+                                  hostServers.removeAt(index); // Menghapus host
                                 });
                                 await _saveHostsToPreferences();
-                                Navigator.pop(context);
+                                await refreshHosts(); // Memanggil refreshHosts
+                                Navigator.pop(context); // Menutup bottom sheet
                               },
                               child: const Text(
                                 "Hapus",
@@ -465,7 +462,8 @@ void modifyHostBottomSheet(
                             ),
                             const SizedBox(width: 8),
                             GestureDetector(
-                              onTap: () => Navigator.pop(context),
+                              onTap: () => Navigator.pop(
+                                  context), // Menutup bottom sheet
                               child: const Text(
                                 "Batal",
                                 style: TextStyle(
@@ -511,15 +509,15 @@ void modifyHostBottomSheet(
                           "password": password,
                         };
                         setState(() {
-                          hostServers[index] = updatedHost;
+                          hostServers[index] = updatedHost; // Update host data
                         });
                         await _saveHostsToPreferences();
-                        Navigator.pop(context);
+                        await refreshHosts(); // Memanggil refreshHosts untuk update UI
+                        Navigator.pop(context); // Menutup bottom sheet
                       },
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
-                        backgroundColor: const Color(
-                            0xFF343746), // Mengubah warna tombol menjadi #343746
+                        backgroundColor: const Color(0xFF343746),
                       ),
                       child: const Text("Simpan",
                           style: TextStyle(fontSize: 18, color: Colors.white)),
@@ -530,56 +528,6 @@ void modifyHostBottomSheet(
             },
           ),
         ),
-      );
-    },
-  );
-}
-
-// Fungsi untuk menampilkan informasi host dalam list
-Widget buildHostList(BuildContext context) {
-  return FutureBuilder(
-    future: _loadHostsFromPreferences(),
-    builder: (context, snapshot) {
-      return ListView.builder(
-        itemCount: hostServers.length,
-        itemBuilder: (context, index) {
-          final host = hostServers[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            child: ListTile(
-              leading: Icon(Icons.cloud, color: Colors.blue),
-              title: Text(host['name'] ?? 'Unknown'),
-              subtitle: Text('${host['username']}, ${host['hostname']}'),
-              onTap: () => showDialog(
-                context: context,
-                builder: (BuildContext context) {
-                  return AlertDialog(
-                    title: Text("Detail Host"),
-                    content: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text("Name: ${host['name']}"),
-                        Text("Hostname: ${host['hostname']}"),
-                        Text("Port: ${host['port']}"),
-                        Text("Username: ${host['username']}"),
-                        Text("Password: ${host['password']}"),
-                      ],
-                    ),
-                    actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text("Tutup")),
-                    ],
-                  );
-                },
-              ),
-              onLongPress: () => modifyHostBottomSheet(context, host, index),
-            ),
-          );
-        },
       );
     },
   );
@@ -604,4 +552,69 @@ Widget _buildTextField({
           borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
     ),
   );
+}
+
+class PasswordField extends StatefulWidget {
+  final Function(String) onChanged;
+  final String initialValue; // Menambahkan parameter initialValue
+
+  const PasswordField({
+    super.key,
+    required this.onChanged,
+    this.initialValue =
+        '', // Default menjadi string kosong jika tidak diberikan
+  });
+
+  @override
+  _PasswordFieldState createState() => _PasswordFieldState();
+}
+
+class _PasswordFieldState extends State<PasswordField> {
+  bool _isObscured = true;
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(
+        text:
+            widget.initialValue); // Inisialisasi controller dengan initialValue
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: _controller, // Menggunakan controller di sini
+      obscureText: _isObscured,
+      onChanged: widget.onChanged,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: 'Password',
+        labelStyle: const TextStyle(color: Colors.white),
+        suffixIcon: IconButton(
+          icon: Icon(
+            _isObscured ? Icons.visibility : Icons.visibility_off,
+            color: Colors.white,
+          ),
+          onPressed: () {
+            setState(() {
+              _isObscured = !_isObscured;
+            });
+          },
+        ),
+        filled: true,
+        fillColor: const Color(0xFF15181F),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+      ),
+    );
+  }
 }
