@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'sftp_connection.dart';
 import '../utils/ssh_connection.dart';
+import 'dir_screen.dart';
 
 List<Map<String, String>> hostServers = [];
 
@@ -15,11 +16,20 @@ class FileTransferPage extends StatefulWidget {
   _FileTransferPageState createState() => _FileTransferPageState();
 }
 
-class _FileTransferPageState extends State<FileTransferPage> {
+class _FileTransferPageState extends State<FileTransferPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadHostsFromPreferences();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadHostsFromPreferences() async {
@@ -36,41 +46,42 @@ class _FileTransferPageState extends State<FileTransferPage> {
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        body: Column(
-          children: [
-            const SizedBox(height: 50),
-            Container(
-              color: Colors.black,
-              child: const TabBar(
-                indicatorColor: Colors.white,
-                labelColor: Colors.white,
-                unselectedLabelColor: Colors.white70,
-                tabs: [
-                  Tab(text: 'Host 1'),
-                  Tab(text: 'Host 2'),
-                ],
-              ),
+    return Scaffold(
+      body: Column(
+        children: [
+          const SizedBox(height: 50),
+          Container(
+            color: Colors.black,
+            child: TabBar(
+              controller: _tabController,
+              indicatorColor: Colors.white,
+              labelColor: Colors.white,
+              unselectedLabelColor: Colors.white70,
+              tabs: const [
+                Tab(text: 'Host 1'),
+                Tab(text: 'Host 2'),
+              ],
             ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  HostPage(),
-                  HostPage(),
-                ],
-              ),
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                HostPage(tabController: _tabController),
+                HostPage(tabController: _tabController),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
 class HostPage extends StatefulWidget {
-  const HostPage({super.key});
+  final TabController tabController;
+
+  const HostPage({super.key, required this.tabController});
 
   @override
   _HostPageState createState() => _HostPageState();
@@ -78,30 +89,28 @@ class HostPage extends StatefulWidget {
 
 class _HostPageState extends State<HostPage> {
   late List<Map<String, String>> servers;
+  bool _showDirScreen = false;
 
   @override
   void initState() {
     super.initState();
-    servers = hostServers; // Gunakan data server yang tersimpan
-    _loadHostsFromPreferences(); // Memuat data awal dari SharedPreferences
+    servers = hostServers;
+    _loadHostsFromPreferences();
   }
 
-  // Fungsi untuk memuat ulang daftar host (sudah terdefinisi di _HostPageState)
   Future<void> refreshHosts() async {
     await _loadHostsFromPreferences();
     setState(() {
-      servers = hostServers; // Perbarui tampilan dengan data terbaru
+      servers = hostServers;
     });
   }
 
-  // Fungsi untuk memuat data dari SharedPreferences
   Future<void> _loadHostsFromPreferences() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String>? savedHosts = prefs.getStringList('hostServers');
 
     if (savedHosts != null) {
       setState(() {
-        // Memuat data dari SharedPreferences ke dalam hostServers
         hostServers = savedHosts
             .map((hostJson) => Map<String, String>.from(jsonDecode(hostJson)))
             .toList();
@@ -110,12 +119,10 @@ class _HostPageState extends State<HostPage> {
   }
 
   Future<void> _removeHost(int index) async {
-    // Hapus host dari list
     setState(() {
       hostServers.removeAt(index);
     });
 
-    // Simpan kembali ke SharedPreferences setelah penghapusan
     SharedPreferences prefs = await SharedPreferences.getInstance();
     List<String> updatedHostList =
         hostServers.map((host) => jsonEncode(host)).toList();
@@ -124,60 +131,47 @@ class _HostPageState extends State<HostPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 20),
-            const Text(
-              "Pilih server",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 20),
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: refreshHosts, // Memanggil fungsi refresh
-                child: ListView.builder(
-                  itemCount: servers.isEmpty
-                      ? 1
-                      : servers
-                          .length, // Jika kosong, tampilkan 1 item (untuk pesan)
-                  itemBuilder: (context, index) {
-                    if (servers.isEmpty) {
-                      // Jika server kosong, tampilkan pesan dan icon
-                      return Align(
-                        alignment:
-                            Alignment.center, // Menjaga posisi tetap di tengah
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment
-                              .center, // Agar semua widget terpusat di tengah
-                          children: [
-                            Icon(Icons.cloud_off, size: 50, color: Colors.grey),
-                            const SizedBox(height: 10),
-                            const Text(
-                              "Belum ada server",
-                              style:
-                                  TextStyle(fontSize: 16, color: Colors.grey),
-                            ),
-                          ],
-                        ),
-                      );
-                    } else {
-                      // Jika ada server, tampilkan item seperti biasa
-                      return _buildHostTile(servers[index], index);
-                    }
-                  },
-                ),
+    // Tampilkan DirScreen jika _showDirScreen true, atau daftar server jika false
+    return _showDirScreen
+        ? DirScreen(
+            onClose: () {
+              setState(() {
+                _showDirScreen = false;
+              });
+            },
+          )
+        : Scaffold(
+            body: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Pilih server",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 20),
+                  Expanded(
+                    child: RefreshIndicator(
+                      onRefresh: refreshHosts,
+                      child: ListView.builder(
+                        itemCount: servers.isEmpty ? 1 : servers.length,
+                        itemBuilder: (context, index) {
+                          if (servers.isEmpty) {
+                            return Center(child: Text("Belum ada server"));
+                          } else {
+                            return _buildHostTile(servers[index], index);
+                          }
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ],
-        ),
-      ),
-      floatingActionButton: _buildAddNewHost(context),
-    );
+            floatingActionButton: _buildAddNewHost(context),
+          );
   }
 
   Widget _buildAddNewHost(BuildContext context) {
@@ -190,7 +184,6 @@ class _HostPageState extends State<HostPage> {
     );
   }
 
-// Widget list server
   Widget _buildHostTile(Map<String, String> server, int index) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -203,38 +196,29 @@ class _HostPageState extends State<HostPage> {
           modifyHostBottomSheet(context, server, index, refreshHosts);
         },
         onTap: () async {
-          // Mengambil informasi dari server
           String host = server['hostname'] ?? '';
           String username = server['username'] ?? '';
-          String password =
-              server['password'] ?? ''; // Pastikan password juga ada
+          String password = server['password'] ?? '';
 
-          // Membuat instansi dari SSHConnection
           SSHConnection sshConnection = SSHConnection();
 
-          // Coba untuk menghubungkan ke server
           try {
             await sshConnection.connect(host, username, password);
             if (sshConnection.isConnected) {
-              // Jika berhasil terhubung, tampilkan pesan atau lakukan aksi lebih lanjut
               print("Successfully connected to $host via SFTP");
 
-              // Misalnya, list direktori root untuk contoh
-              List<SftpName> directories =
-                  await sshConnection.listDirectory('/');
-              print(
-                  "List of directories: ${directories.map((e) => e.filename).join(', ')}");
-
-              // Menampilkan alert atau tindakan lainnya
               ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Connected to $host via SFTP')));
+
+              // Tampilkan DirScreen di dalam HostPage
+              setState(() {
+                _showDirScreen = true;
+              });
             } else {
-              // Jika koneksi gagal
               ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Failed to connect to $host')));
             }
           } catch (e) {
-            // Tangani error jika ada
             print("Error: $e");
             ScaffoldMessenger.of(context)
                 .showSnackBar(SnackBar(content: Text('Error: $e')));
