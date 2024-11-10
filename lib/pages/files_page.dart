@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dartssh2/dartssh2.dart';
 import 'sftp_connection.dart';
+import '../utils/ssh_connection.dart';
 
 List<Map<String, String>> hostServers = [];
 
@@ -189,7 +190,7 @@ class _HostPageState extends State<HostPage> {
     );
   }
 
-  // Fungsi untuk membangun tampilan tiap host dalam list
+// Widget list server
   Widget _buildHostTile(Map<String, String> server, int index) {
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -200,6 +201,44 @@ class _HostPageState extends State<HostPage> {
         subtitle: Text('${server['username']}, ${server['hostname']}'),
         onLongPress: () {
           modifyHostBottomSheet(context, server, index, refreshHosts);
+        },
+        onTap: () async {
+          // Mengambil informasi dari server
+          String host = server['hostname'] ?? '';
+          String username = server['username'] ?? '';
+          String password =
+              server['password'] ?? ''; // Pastikan password juga ada
+
+          // Membuat instansi dari SSHConnection
+          SSHConnection sshConnection = SSHConnection();
+
+          // Coba untuk menghubungkan ke server
+          try {
+            await sshConnection.connect(host, username, password);
+            if (sshConnection.isConnected) {
+              // Jika berhasil terhubung, tampilkan pesan atau lakukan aksi lebih lanjut
+              print("Successfully connected to $host via SFTP");
+
+              // Misalnya, list direktori root untuk contoh
+              List<SftpName> directories =
+                  await sshConnection.listDirectory('/');
+              print(
+                  "List of directories: ${directories.map((e) => e.filename).join(', ')}");
+
+              // Menampilkan alert atau tindakan lainnya
+              ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Connected to $host via SFTP')));
+            } else {
+              // Jika koneksi gagal
+              ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to connect to $host')));
+            }
+          } catch (e) {
+            // Tangani error jika ada
+            print("Error: $e");
+            ScaffoldMessenger.of(context)
+                .showSnackBar(SnackBar(content: Text('Error: $e')));
+          }
         },
       ),
     );
