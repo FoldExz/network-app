@@ -428,7 +428,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("SSH Terminal"),
+        title: const Text(
+          "SSH Terminal",
+          style: AppStyles.poppinsRegular,
+        ),
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
@@ -451,7 +456,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
             // Input perintah di terminal
             Padding(
-              padding: const EdgeInsets.only(bottom: 20.0),
+              padding: const EdgeInsets.only(bottom: 1),
               child: Column(
                 children: [
                   Row(
