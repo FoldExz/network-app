@@ -380,23 +380,27 @@ class TerminalScreen extends StatefulWidget {
 class _TerminalScreenState extends State<TerminalScreen> {
   final TextEditingController _commandController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
-  final ScrollController _scrollController =
-      ScrollController(); // Tambahkan ScrollController
+  final ScrollController _scrollController = ScrollController();
   String _output = "";
+  double _fontSize = 14;
 
-  // Fungsi untuk mengirimkan command ke SSH
+  List<String> _commandHistory = [];
+  int _historyIndex = -1;
+
   Future<void> _sendCommand(String command) async {
+    if (command.isEmpty) return;
+
     final result = await widget.sshConnection.executeCommand(command);
     setState(() {
       _output += '\n\$ $command\n$result';
+      _commandHistory.add(command);
+      _historyIndex = _commandHistory.length;
     });
 
-    // Scroll otomatis ke bawah
     _scrollToBottom();
     _commandController.clear();
   }
 
-  // Fungsi untuk mengatur scroll ke bawah
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
@@ -409,20 +413,56 @@ class _TerminalScreenState extends State<TerminalScreen> {
     });
   }
 
-  // Fungsi untuk menyembunyikan/memunculkan keyboard
   void _toggleKeyboard() {
     if (_focusNode.hasFocus) {
-      _focusNode.unfocus(); // Menyembunyikan keyboard
+      _focusNode.unfocus();
     } else {
-      FocusScope.of(context).requestFocus(_focusNode); // Memunculkan keyboard
+      FocusScope.of(context).requestFocus(_focusNode);
     }
+  }
+
+  void _zoomIn() {
+    setState(() {
+      _fontSize += 2;
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _fontSize = (_fontSize - 2).clamp(10, 30);
+    });
+  }
+
+  void _handleArrowUp() {
+    setState(() {
+      if (_historyIndex > 0) {
+        _historyIndex--;
+        _commandController.text = _commandHistory[_historyIndex];
+        _commandController.selection = TextSelection.fromPosition(
+            TextPosition(offset: _commandController.text.length));
+      }
+    });
+  }
+
+  void _handleArrowDown() {
+    setState(() {
+      if (_historyIndex < _commandHistory.length - 1) {
+        _historyIndex++;
+        _commandController.text = _commandHistory[_historyIndex];
+      } else {
+        _historyIndex = _commandHistory.length;
+        _commandController.clear();
+      }
+      _commandController.selection = TextSelection.fromPosition(
+          TextPosition(offset: _commandController.text.length));
+    });
   }
 
   @override
   void dispose() {
     widget.sshConnection.close();
     _focusNode.dispose();
-    _scrollController.dispose(); // Dispose ScrollController
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -432,7 +472,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
       appBar: AppBar(
         title: const Text(
           "SSH Terminal",
-          style: AppStyles.poppinsRegular,
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600),
         ),
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
@@ -443,20 +483,17 @@ class _TerminalScreenState extends State<TerminalScreen> {
           children: [
             Expanded(
               child: SingleChildScrollView(
-                controller:
-                    _scrollController, // Pasang ScrollController di sini
-                child: Text(
+                controller: _scrollController,
+                child: SelectableText(
                   _output,
-                  style: const TextStyle(
+                  style: TextStyle(
+                    fontSize: _fontSize,
                     color: Colors.green,
-                    fontFamily:
-                        'Consolas', // Menggunakan font Consolas untuk output
+                    fontFamily: 'Consolas',
                   ),
                 ),
               ),
             ),
-
-            // Input perintah di terminal
             Padding(
               padding: const EdgeInsets.only(bottom: 1),
               child: Column(
@@ -474,8 +511,11 @@ class _TerminalScreenState extends State<TerminalScreen> {
                         child: TextField(
                           controller: _commandController,
                           focusNode: _focusNode,
-                          style: const TextStyle(
-                              color: Colors.white, fontFamily: 'Consolas'),
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontFamily: 'Consolas',
+                            fontSize: _fontSize,
+                          ),
                           decoration: const InputDecoration(
                             hintText: 'Enter command',
                             border: InputBorder.none,
@@ -488,22 +528,30 @@ class _TerminalScreenState extends State<TerminalScreen> {
                       ),
                     ],
                   ),
-                  // Row untuk shortcut keyboard tanpa kotak
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildShortcutText('Ctrl', () {
-                        _commandController.text += "Ctrl ";
-                      }),
-                      _buildShortcutText('Tab', () {
-                        _commandController.text += "Tab ";
-                      }),
-                      _buildShortcutText('Esc', () {
-                        _commandController.text += "Esc ";
-                      }),
+                      IconButton(
+                        icon:
+                            const Icon(Icons.arrow_upward, color: Colors.white),
+                        onPressed: _handleArrowUp,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_downward,
+                            color: Colors.white),
+                        onPressed: _handleArrowDown,
+                      ),
                       IconButton(
                         icon: const Icon(Icons.keyboard, color: Colors.white),
                         onPressed: _toggleKeyboard,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.zoom_out, color: Colors.white),
+                        onPressed: _zoomOut,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.zoom_in, color: Colors.white),
+                        onPressed: _zoomIn,
                       ),
                     ],
                   ),
@@ -516,19 +564,19 @@ class _TerminalScreenState extends State<TerminalScreen> {
     );
   }
 
-  Widget _buildShortcutText(String label, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 16,
-          fontFamily: 'Arial Rounded MT Bold',
-          color: Colors.white,
-        ),
-      ),
-    );
-  }
+  // Widget _buildShortcutText(String label, VoidCallback onTap) {
+  //   return GestureDetector(
+  //     onTap: onTap,
+  //     child: Text(
+  //       label,
+  //       style: TextStyle(
+  //         fontSize: 16,
+  //         fontFamily: 'Arial Rounded MT Bold',
+  //         color: _isCtrlActive && label == 'Ctrl' ? Colors.blue : Colors.white,
+  //       ),
+  //     ),
+  //   );
+  // }
 }
 
 // Widget untuk input password dengan show/hide
