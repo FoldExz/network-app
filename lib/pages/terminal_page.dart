@@ -1,17 +1,72 @@
 import 'package:flutter/material.dart';
-import 'package:dart_ping/dart_ping.dart'; // Import package dart_ping
+import 'package:dart_ping/dart_ping.dart';
 import 'package:flutter/services.dart';
 import '../utils/ssh_connection.dart';
 import '../styles/app_color.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../styles/app_styles.dart';
 
-class TerminalPage extends StatelessWidget {
-  TerminalPage({super.key});
+class TerminalPage extends StatefulWidget {
+  const TerminalPage({super.key});
 
+  @override
+  _TerminalPageState createState() => _TerminalPageState();
+}
+
+class _TerminalPageState extends State<TerminalPage> {
   final _sshConnection = SSHConnection();
   final TextEditingController _hostController = TextEditingController();
   final TextEditingController _usernameController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  List<Map<String, String>> savedHosts = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHosts();
+  }
+
+  // Load the saved hosts from SharedPreferences
+  Future<void> _loadHosts() async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String>? hostList = prefs.getStringList('savedHosts');
+
+    if (hostList != null) {
+      setState(() {
+        savedHosts = hostList.map((e) {
+          final parts = e.split('|');
+          return {
+            'host': parts[0],
+            'username': parts[1],
+          };
+        }).toList();
+      });
+    }
+  }
+
+  // Save a new host to SharedPreferences, ensuring no duplicates
+  Future<void> _saveHost(String host, String username) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> hostList = prefs.getStringList('savedHosts') ?? [];
+
+    // Check if the host and username combination already exists
+    bool exists = hostList.any((item) {
+      final parts = item.split('|');
+      return parts[0] == host && parts[1] == username;
+    });
+
+    if (!exists) {
+      // If the host-username combination doesn't exist, add it
+      hostList.add('$host|$username');
+      await prefs.setStringList('savedHosts', hostList);
+      _loadHosts(); // Reload hosts after saving
+    } else {
+      // Optionally, show an error or message to inform the user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('This configuration already exists!')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -103,38 +158,101 @@ class TerminalPage extends StatelessWidget {
                     ),
                   ),
                 ),
+                const SizedBox(height: 20),
+                Text(
+                  'Saved Hosts',
+                  style: TextStyle(
+                    fontSize: baseFontSize,
+                    color: AppColors.white,
+                    fontFamily: 'Poppins',
+                  ),
+                ),
+                const SizedBox(height: 10),
+                // Display saved hosts in ListView
+                // Inside ListView.builder:
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: savedHosts.length,
+                    itemBuilder: (context, index) {
+                      final host = savedHosts[index];
+                      return ListTile(
+                        title: Text(
+                          host['host'] ?? '',
+                          style: TextStyle(
+                              color: AppColors.white, fontSize: baseFontSize),
+                        ),
+                        subtitle: Text(
+                          host['username'] ?? '',
+                          style: TextStyle(
+                            color: AppColors.mediumGray,
+                            fontSize: baseFontSize * 0.9,
+                          ),
+                        ),
+                        onTap: () async {
+                          // Grab the host and username from the tapped saved host
+                          String selectedHost = host['host'] ?? '';
+                          String selectedUsername = host['username'] ?? '';
+
+                          // Optionally, you could load the password from SharedPreferences, or prompt the user for it
+                          Map<String, String?> config =
+                              await _loadConfiguration();
+                          String? savedPassword = config['password'];
+
+                          // You can use this data to either connect directly or show a password entry modal
+                          if (selectedHost.isNotEmpty &&
+                              selectedUsername.isNotEmpty) {
+                            // Option 1: Direct connection (if password is available)
+                            if (savedPassword != null) {
+                              _sshConnection.connect(selectedHost,
+                                  selectedUsername, savedPassword);
+                              _showTerminalScreen(context);
+                            } else {
+                              // Option 2: Show password input modal if password is missing
+                              _showPasswordBottomSheet(context,
+                                  "ssh ${selectedUsername}@${selectedHost}");
+                            }
+                          } else {
+                            // Handle any error cases, e.g., invalid host/username
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                  content:
+                                      Text('Invalid saved host or username')),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                )
               ],
             ),
           );
         },
       ),
+      floatingActionButton: _buildAddNewHost(context), // FloatingActionButton
     );
   }
 
-  Future<bool> _checkHostAvailability(String host) async {
-    final ping = Ping(host, count: 3, timeout: 1); // Timeout dalam detik
-    bool isReachable = false;
-
-    await for (final pingData in ping.stream) {
-      if (pingData.response != null) {
-        isReachable = true;
-        break;
-      }
-    }
-
-    return isReachable;
+  Widget _buildAddNewHost(BuildContext context) {
+    return FloatingActionButton(
+      onPressed: () {
+        _showPasswordBottomSheet(context, ""); // Trigger modal to add new host
+      },
+      backgroundColor: Colors.green,
+      child: const Icon(Icons.add, size: 40),
+    );
   }
 
-  void _showPasswordBottomSheet(BuildContext context, String command) {
+  Future<void> _showPasswordBottomSheet(
+      BuildContext context, String command) async {
     bool _isLoading = false;
-    // ignore: unused_local_variable
     bool isError = false;
 
-    // Parsing command to extract username and host address
-    String host = '';
-    String username = '';
+    Map<String, String?> config = await _loadConfiguration();
+    String host = config['host'] ?? '';
+    String username = config['username'] ?? '';
 
-    // Format yang diharapkan adalah 'ssh username@host'
+    // If command is provided, parse it
     if (command.startsWith("ssh")) {
       final regex = RegExp(r"ssh\s+([^\@]+)\@([^\s]+)");
       final match = regex.firstMatch(command);
@@ -145,7 +263,6 @@ class TerminalPage extends StatelessWidget {
       }
     }
 
-    // Mengisi controller dengan nilai yang terparsing
     _hostController.text = host;
     _usernameController.text = username;
 
@@ -171,9 +288,9 @@ class TerminalPage extends StatelessWidget {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(
+                        const Text(
                           'New host',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontFamily: 'Poppins',
                             fontWeight: FontWeight.bold,
                             color: AppColors.white,
@@ -183,9 +300,9 @@ class TerminalPage extends StatelessWidget {
                           onTap: () {
                             Navigator.pop(context);
                           },
-                          child: Text(
+                          child: const Text(
                             'Cancel',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Poppins',
                               fontWeight: FontWeight.normal,
                               color: AppColors.green,
@@ -278,35 +395,32 @@ class TerminalPage extends StatelessWidget {
                           String username = _usernameController.text;
                           String password = _passwordController.text;
 
-                          // Cek apakah host dapat dijangkau
                           bool isReachable = await _checkHostAvailability(host);
                           if (!isReachable) {
                             setState(() {
                               _isLoading = false;
                               isError = true;
                             });
-                            return; // Jangan lanjutkan jika host tidak bisa dijangkau
+                            return;
                           }
 
                           try {
-                            // Mencoba untuk melakukan koneksi SSH
                             await _sshConnection.connect(
                                 host, username, password);
+                            // Save configuration dan host
+                            await _saveConfiguration(host, username, password);
+                            await _saveHost(host, username);
 
-                            // Jika berhasil, tutup bottom sheet dan buka TerminalScreen
                             Navigator.pop(context);
-
-                            // **Buka TerminalScreen hanya jika koneksi berhasil**
-                            _showTerminalScreen(context);
+                            _showTerminalScreen(
+                                context); //membuka termninal screen
                           } catch (e) {
-                            // Jika gagal (misalnya Connection Refused), tampilkan pesan kesalahan
                             setState(() {
                               _isLoading = false;
                               isError = true;
                             });
 
-                            // Menampilkan error jika koneksi gagal
-                            print("Koneksi SSH gagal: $e");
+                            print("Connection failed: $e");
                           }
                         },
                         style: ElevatedButton.styleFrom(
@@ -333,10 +447,22 @@ class TerminalPage extends StatelessWidget {
     );
   }
 
+  Future<bool> _checkHostAvailability(String host) async {
+    final ping = Ping(host, count: 3, timeout: 1);
+    bool isReachable = false;
+
+    await for (final pingData in ping.stream) {
+      if (pingData.response != null) {
+        isReachable = true;
+        break;
+      }
+    }
+
+    return isReachable;
+  }
+
   void _showTerminalScreen(BuildContext context) async {
-    // Pastikan SSHConnection telah berhasil terkoneksi sebelumnya
-    bool isConnected =
-        _sshConnection.isConnected; // Menggunakan getter isConnected
+    bool isConnected = _sshConnection.isConnected;
 
     if (isConnected) {
       Navigator.push(
@@ -346,26 +472,30 @@ class TerminalPage extends StatelessWidget {
         ),
       );
     } else {
-      // Jika tidak terkoneksi, tampilkan pesan kesalahan atau tidak melakukan apa-apa
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content: Text("Koneksi SSH gagal. Tidak dapat membuka terminal.")),
+          content: Text("Koneksi SSH gagal. Tidak dapat membuka terminal."),
+        ),
       );
     }
   }
+}
 
-// Fungsi untuk mengecek status koneksi SSH
-  Future<bool> _checkSSHConnection() async {
-    try {
-      // Cek koneksi SSH
-      bool isReachable = await _sshConnection.isConnected;
-      return isReachable;
-    } catch (e) {
-      // Jika gagal, berarti koneksi tidak berhasil
-      print("Koneksi SSH gagal: $e");
-      return false;
-    }
-  }
+Future<void> _saveConfiguration(
+    String host, String username, String password) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString('host', host);
+  await prefs.setString('username', username);
+  await prefs.setString('password', password);
+}
+
+Future<Map<String, String?>> _loadConfiguration() async {
+  final prefs = await SharedPreferences.getInstance();
+  String? host = prefs.getString('host');
+  String? username = prefs.getString('username');
+  String? password = prefs.getString('password');
+
+  return {'host': host, 'username': username, 'password': password};
 }
 
 class TerminalScreen extends StatefulWidget {
