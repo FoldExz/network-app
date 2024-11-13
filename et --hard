@@ -1,0 +1,144 @@
+[33mcommit 78bb4a679bc6a45f5e192b5f2aabbaf386a49bdf[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Wed Nov 13 13:44:41 2024 +0700
+
+    add hosts list
+
+[33mcommit aa18fb81a6413e4db68667321ebaaa3c9dc3d0d0[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Mon Nov 11 19:33:21 2024 +0700
+
+    terminal page done
+
+[33mcommit 4e5079e3650bb8d4ef0ea8dfbdc6a64f8881a0fd[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 23:31:28 2024 +0700
+
+    no error :D
+
+[33mcommit 258770f43dd0c062449914c1ae52f3b3522b82cd[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 23:18:57 2024 +0700
+
+    add dir_screen
+
+[33mcommit 449fdc36b036db6ca385a028a2d5eb9af9ea2c96[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 20:31:35 2024 +0700
+
+    sftp connection done
+
+[33mcommit a4735adb8565fd4ec6f70ef3291e9fad32c1ba47[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 20:10:59 2024 +0700
+
+    refresh updt
+
+[33mcommit 6ced6cae8ad665e89109968471f2236100b25d2f[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 18:49:16 2024 +0700
+
+    change ui
+
+[33mcommit ea3ce6f71d233b686d8c8585614435154dcbc7ab[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 16:52:26 2024 +0700
+
+    reload after add host
+
+[33mcommit f30d43d8bd3c98d0d5bdc14f7c11be45cc72c8e0[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 13:00:22 2024 +0700
+
+    terminal page done, kurang icon esc, tab, esc
+
+[33mcommit dd95d9cd06e376dd126b508acef000b19989cc7a[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 02:14:19 2024 +0700
+
+    resolve UI terminal screen
+
+[33mcommit 13451878de353bdec535a1709ac1049fabfdcb90[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 10 00:25:46 2024 +0700
+
+    memperbaiki bottom sheet terminal
+
+[33mcommit 20df0240c5f05fea71e26d1a21e6913b9fbf5fa9[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sat Nov 9 22:49:42 2024 +0700
+
+    discard telnet
+
+[33mcommit 652de4a8724376f5437c1f4c6ce5eefa842ec126[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sat Nov 9 21:15:12 2024 +0700
+
+    add ssh remote feature
+    Co-authored-by: hariTammim55 <hariTammim55@users.noreply.github.com>
+
+[33mcommit 6b13e830a9746001f6c4df23f0d8210bdc5ec44a[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 3 23:01:40 2024 +0700
+
+    change app icon and name
+
+[33mcommit 516bdfd4624bfdb46b4556299eea47614d598898[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 3 22:26:05 2024 +0700
+
+    change app icon
+
+[33mcommit 4e0cb9f9e00139d8def3a7ce30440f583f3f5553[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Sun Nov 3 16:58:39 2024 +0700
+
+    Sniffing done
+
+[33mcommit 26afabfcfba1620a9a41fd406fb93f5efd325b74[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Wed Oct 30 17:35:35 2024 +0700
+
+    penyempurnaan popup
+
+[33mcommit 1bc5c6182e46c44b2fa5291b9a630e834ff82009[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Wed Oct 30 16:54:05 2024 +0700
+
+    add popup
+
+[33mcommit 2eb67e0f3284e73c2ad36ff2464ecf9b949ddc5c[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Tue Oct 29 20:57:57 2024 +0700
+
+    penerapan flutter_network_inspector
+
+[33mcommit e11fb9e7fadc47bb9dda0303ef16d06ae7ed2deb[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Tue Oct 29 19:17:03 2024 +0700
+
+    sniffing page
+
+[33mcommit 514e66022daf54db4580399a6400ecc67f7c3ad6[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Tue Oct 29 19:06:44 2024 +0700
+
+    yaml network_inspector
+
+[33mcommit 0baa34634b7e637a1bcc47c49b8e9f7871d8578c[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Tue Oct 29 19:03:17 2024 +0700
+
+    menghilangkan settingan firebase sebelumnya
+
+[33mcommit 12ba03e127abce22f717fa18e18c7231e6ddaeff[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Tue Oct 22 15:55:19 2024 +0700
+
+    first UI
+
+[33mcommit 1b92dceb4e2a3012e6538c94e2537d6bca861dce[m
+Author: FoldExz <ihsantazakisanjaya@gmail.com>
+Date:   Tue Oct 22 15:50:41 2024 +0700
+
+    first commit

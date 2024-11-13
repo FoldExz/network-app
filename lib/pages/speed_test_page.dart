@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:speed_test_dart/classes/classes.dart';
-import 'package:speed_test_dart/speed_test_dart.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'dart:async';
-import 'dart:math' as math;
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import '../utils/network_check.dart';
+import 'dart:math';
 
 class SpeedTestPage extends StatefulWidget {
   const SpeedTestPage({super.key});
@@ -12,197 +12,247 @@ class SpeedTestPage extends StatefulWidget {
   _SpeedTestPageState createState() => _SpeedTestPageState();
 }
 
-class _SpeedTestPageState extends State<SpeedTestPage>
-    with SingleTickerProviderStateMixin {
-  SpeedTestDart tester = SpeedTestDart();
-  List<Server> bestServersList = [];
-  double downloadSpeed = 0.0;
-  double uploadSpeed = 0.0;
+class _SpeedTestPageState extends State<SpeedTestPage> {
+  bool isConnected = true;
+  double? downloadSpeed;
+  double? uploadSpeed;
+  StreamSubscription<bool>? _internetSubscription;
   bool isTesting = false;
-  bool isConnected =
-      false; // Ubah ini menjadi false untuk mode "internet not connected"
-  late AnimationController _rotationController;
+
+  // URL untuk pengujian download dan upload
+  final String downloadUrl =
+      'https://hel1-speed.hetzner.com/100MB.bin'; // URL download baru
+  final String uploadUrl =
+      'http://192.168.100.11:3000/upload'; // URL upload server lokal
 
   @override
   void initState() {
     super.initState();
-    // setBestServers();
-    _checkConnection();
-    Connectivity()
-        .onConnectivityChanged
-        .listen((List<ConnectivityResult> results) {
+    _internetSubscription = NetworkCheck.internetStatusStream.listen((status) {
       setState(() {
-        isConnected = results.contains(ConnectivityResult.mobile) ||
-            results.contains(ConnectivityResult.wifi);
+        isConnected = status;
       });
-    });
-    _rotationController = AnimationController(
-      duration:
-          const Duration(seconds: 5), // Durasi 2 detik untuk satu rotasi penuh
-      vsync: this,
-    );
-  }
-
-  Future<void> setBestServers() async {
-    final settings = await tester.getSettings();
-    final servers = settings.servers;
-
-    final BestServersList = await tester.getBestServers(
-      servers: servers,
-    );
-
-    setState(() {
-      bestServersList = BestServersList;
-    });
-  }
-
-  void _startSpeedTest() async {
-    setState(() {
-      isTesting = true; // Menandai pengujian sedang berlangsung
-      _rotationController.repeat(); // Mulai animasi berputar
-    });
-
-    if (bestServersList.isNotEmpty) {
-      downloadSpeed = await tester.testDownloadSpeed(servers: bestServersList);
-      uploadSpeed = await tester.testUploadSpeed(servers: bestServersList);
-    }
-
-    setState(() {
-      isTesting = false; // Menandai pengujian selesai
-      _rotationController.stop(); // Hentikan animasi berputar
-    });
-  }
-
-  void _checkConnection() async {
-    var connectivityResult = await (Connectivity().checkConnectivity());
-    print("Connectivity result: $connectivityResult"); // Menambahkan logging
-
-    setState(() {
-      // Update isConnected berdasarkan hasil pemeriksaan koneksi
-      isConnected = connectivityResult == ConnectivityResult.mobile ||
-          connectivityResult == ConnectivityResult.wifi;
     });
   }
 
   @override
+  void dispose() {
+    _internetSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _startSpeedTest() async {
+    print("Speed test started");
+
+    setState(() {
+      isTesting = true;
+      downloadSpeed = null;
+      uploadSpeed = null;
+    });
+
+    // Menjalankan pengujian download dan upload secara paralel
+    var downloadFuture = _testDownloadSpeed();
+    var uploadFuture = _testUploadSpeed();
+
+    var results = await Future.wait([downloadFuture, uploadFuture]);
+
+    // Mendapatkan hasil pengujian download dan upload
+    double? download = results[0];
+    double? upload = results[1];
+
+    print(
+        "Speed test finished. Download: $download Mbps, Upload: $upload Mbps");
+
+    if (mounted) {
+      setState(() {
+        downloadSpeed = download;
+        uploadSpeed = upload ?? -1.0; // Menandakan upload gagal jika null
+        isTesting = false;
+      });
+    }
+  }
+
+  // Fungsi untuk mengonversi ukuran byte ke format yang lebih mudah dibaca (B, KB, MB, GB)
+  String convertSize(int sizeBytes) {
+    if (sizeBytes == 0) {
+      return "0B";
+    }
+    List<String> sizeName = [
+      "B",
+      "KB",
+      "MB",
+      "GB",
+      "TB",
+      "PB",
+      "EB",
+      "ZB",
+      "YB"
+    ];
+    int i = (log(sizeBytes) / log(1024)).floor();
+    num p = pow(1024, i);
+    double s = (sizeBytes / p).roundToDouble();
+    return "${s.toString()}${sizeName[i]}";
+  }
+
+  Future<double?> _testDownloadSpeed() async {
+    print("Starting download speed test...");
+    try {
+      final stopwatch = Stopwatch()..start();
+      final response = await http.get(Uri.parse(downloadUrl));
+
+      if (response.statusCode == 200) {
+        stopwatch.stop();
+        // Jika tidak ada response.contentLength, gunakan bodyBytes.length
+        int bytes = response.contentLength ?? response.bodyBytes.length;
+        double seconds = stopwatch.elapsedMilliseconds / 1000;
+
+        // Pastikan pembagian waktu dalam detik dan ukuran dalam byte yang tepat
+        double speedMbps =
+            (bytes * 8) / (seconds * 1024 * 1024); // Kecepatan dalam Mbps
+
+        String fileSize = convertSize(bytes);
+        print(
+            "Download speed test successful: $speedMbps Mbps, File Size: $fileSize");
+
+        return speedMbps;
+      } else {
+        print("Failed to download. Status Code: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Download speed test failed: $e");
+    }
+    return null;
+  }
+
+  Future<double?> _testUploadSpeed() async {
+    try {
+      final stopwatch = Stopwatch()..start();
+
+      // Menggunakan MultipartRequest untuk memastikan bahwa file di-upload dengan benar
+      var request = http.MultipartRequest(
+        'POST',
+        Uri.parse(uploadUrl),
+      );
+
+      // Menyiapkan file untuk di-upload
+      var file = http.MultipartFile.fromBytes(
+        'file', // field name sesuai yang digunakan di server ('file')
+        List<int>.generate(
+            104857600, (index) => index % 256), // Dummy 100MB data
+        filename: 'filedummy.txt', // Nama file
+      );
+
+      // Menambahkan file ke body request
+      request.files.add(file);
+
+      // Kirim request
+      var response = await request.send();
+      stopwatch.stop();
+
+      // Menghitung kecepatan upload berdasarkan data yang dikirim
+      int bytesSent = file.length;
+      double seconds = stopwatch.elapsedMilliseconds / 1000;
+      double speedMbps = (bytesSent / seconds) / (1024 * 1024) * 8;
+
+      // Mengecek respons
+      if (response.statusCode == 200) {
+        print("Upload speed: $speedMbps Mbps, Data Size: 100MB");
+        return speedMbps;
+      } else {
+        print("Failed to upload data. Status Code: ${response.statusCode}");
+      }
+    } catch (e) {
+      print("Upload speed test failed: $e");
+    }
+    return null;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Mengambil ukuran layar yang tersedia
     var mediaQuery = MediaQuery.of(context);
     double screenWidth = mediaQuery.size.width;
     double screenHeight = mediaQuery.size.height;
-
-    // Membuat ukuran lingkaran proporsional baik berdasarkan lebar maupun tinggi
     double circleSize =
-        (screenWidth < screenHeight ? screenWidth : screenHeight) *
-            0.5; // 50% dari lebar atau tinggi, mana yang lebih kecil
-    double borderWidth =
-        circleSize * 0.025; // Border 2.5% dari ukuran lingkaran
-    double startTextSize =
-        circleSize * 0.22; // Ukuran teks START 22% dari lingkaran
-    double statusTextSize = (screenWidth * 0.05)
-        .clamp(24, 50); // Ukuran teks status, dibatasi min 24px dan max 50px
+        (screenWidth < screenHeight ? screenWidth : screenHeight) * 0.5;
+    double borderWidth = circleSize * 0.025;
+    double startTextSize = circleSize * 0.22;
+    double statusTextSize = (screenWidth * 0.05).clamp(24, 50);
 
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Lingkaran dengan stroke berwarna dan transparan di dalamnya
           GestureDetector(
-            onTap: _startSpeedTest,
-            child: Stack(
-              alignment: Alignment.center, // Menjaga teks tetap di tengah
-              children: [
-                // Lingkaran luar
-                AnimatedBuilder(
-                  animation: _rotationController,
-                  builder: (context, child) {
-                    return Transform.rotate(
-                        angle: _rotationController.value *
-                            2 *
-                            math.pi, // Lingkaran berputar
-                        child: Container(
-                          width: circleSize, // Ukuran lingkaran responsif
-                          height: circleSize, // Ukuran lingkaran responsif
-                          decoration: BoxDecoration(
-                            gradient: isConnected
-                                ? const LinearGradient(
-                                    colors: [
-                                      Color.fromARGB(255, 1, 67, 65),
-                                      Color.fromARGB(255, 27, 173, 146),
-                                      Color(0xFF96F5A9),
-                                    ],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  )
-                                : const LinearGradient(
-                                    colors: [
-                                      Color(0xFF7A1B34),
-                                      Color(0xFFFF2D6A),
-                                      Color(0xFFFFA376),
-                                    ],
-                                    begin: Alignment.topCenter,
-                                    end: Alignment.bottomCenter,
-                                  ),
-                            shape: BoxShape.circle,
-                          ),
-                        ));
-                  },
+            onTap: isTesting ? null : _startSpeedTest,
+            child: Container(
+              width: circleSize,
+              height: circleSize,
+              decoration: BoxDecoration(
+                gradient: isConnected
+                    ? const LinearGradient(
+                        colors: [
+                          Color(0xFF00A19C),
+                          Color(0xFF03CAA4),
+                          Color(0xFF96F5A9),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      )
+                    : const LinearGradient(
+                        colors: [
+                          Color(0xFF7A1B34),
+                          Color(0xFFFF2D6A),
+                          Color(0xFFFFA376),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  width: borderWidth,
+                  color: Colors.transparent,
                 ),
-                // Teks START di tengah lingkaran
-                Container(
-                  width:
-                      circleSize - (2 * borderWidth), // Ukuran lingkaran dalam
-                  height:
-                      circleSize - (2 * borderWidth), // Ukuran lingkaran dalam
+              ),
+              child: Center(
+                child: Container(
+                  width: circleSize - (2 * borderWidth),
+                  height: circleSize - (2 * borderWidth),
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.black, // Latar belakang hitam
+                    color: Colors.black,
                   ),
                   child: Center(
                     child: Text(
-                      'START',
+                      isTesting ? 'Testing...' : 'START',
                       style: TextStyle(
                         fontFamily: 'Poppins',
-                        fontWeight: FontWeight.w600, // Semi Bold
-                        fontSize:
-                            startTextSize, // Ukuran font "START" responsif
+                        fontWeight: FontWeight.w600,
+                        fontSize: startTextSize,
                         color: Colors.white,
                       ),
                     ),
                   ),
                 ),
-              ],
+              ),
             ),
           ),
-
-          SizedBox(
-              height: screenHeight *
-                  0.03), // Jarak antara lingkaran dan teks di bawahnya
+          SizedBox(height: screenHeight * 0.03),
           Text(
-            isConnected
-                ? 'Connected to the internet'
-                // ignore: dead_code
-                : 'internet not connected', // Mengubah teks berdasarkan status koneksi
+            isTesting
+                ? 'Testing in progress...'
+                : downloadSpeed != null
+                    ? 'Download Speed: ${downloadSpeed!.toStringAsFixed(2)} Mbps\nUpload Speed: ${uploadSpeed == null ? 'failed' : uploadSpeed!.toStringAsFixed(2)} Mbps'
+                    : isConnected
+                        ? 'Connected to the internet'
+                        : 'Check connection, \ninternet not connected',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontFamily: 'Poppins',
-              fontWeight: FontWeight.w300, // Light
-              fontSize: statusTextSize, // Ukuran teks status responsif
+              fontWeight: FontWeight.w300,
+              fontSize: statusTextSize,
               color: Colors.white,
             ),
           ),
-          if (isTesting == true) ...[
-            SizedBox(
-                height: screenHeight * 0.03), // Jarak tambahan saat testing
-            Text(
-              'Download Speed: ${downloadSpeed.toStringAsFixed(2)} Mbps',
-              style: const TextStyle(color: Colors.white, fontSize: 20),
-            ),
-            Text(
-              'Upload Speed: ${uploadSpeed.toStringAsFixed(2)} Mbps',
-              style: const TextStyle(color: Colors.white, fontSize: 20),
-            ),
-          ],
         ],
       ),
     );

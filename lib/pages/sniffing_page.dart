@@ -18,13 +18,13 @@ class NetworkStatusPopup extends StatelessWidget {
   final int successfulPackets; // Declare this field correctly
 
   const NetworkStatusPopup({
-    Key? key,
+    super.key,
     required this.successRate,
     required this.avgResponseTime,
     required this.totalDataReceived,
     required this.blockedPackets, // Keep this in the constructor
     required this.successfulPackets, // Add this to the constructor
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -38,11 +38,11 @@ class NetworkStatusPopup extends StatelessWidget {
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
-        padding: EdgeInsets.only(bottom: 70.0, top: 20.0),
+        padding: const EdgeInsets.only(bottom: 70.0, top: 20.0),
         child: Container(
           width: screenWidth * 0.9,
           decoration: BoxDecoration(
-            color: Color(0xFF15181F).withOpacity(0.9),
+            color: const Color(0xFF15181F).withOpacity(0.9),
             borderRadius: BorderRadius.circular(20),
           ),
           padding: const EdgeInsets.all(20),
@@ -52,7 +52,7 @@ class NetworkStatusPopup extends StatelessWidget {
             children: [
               Text(
                 networkStatusText,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
@@ -69,7 +69,7 @@ class NetworkStatusPopup extends StatelessWidget {
                   Expanded(
                     child: Text(
                       'Status Jaringan: ${blockedPackets > 0 ? "Terdapat paket yang diblokir: $blockedPackets" : "Semua paket berhasil diterima"}',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ],
@@ -77,12 +77,12 @@ class NetworkStatusPopup extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.show_chart, color: Colors.blue),
+                  const Icon(Icons.show_chart, color: Colors.blue),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Rata-rata waktu respons: ${avgResponseTime} ms',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      'Rata-rata waktu respons: $avgResponseTime ms',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ],
@@ -90,12 +90,12 @@ class NetworkStatusPopup extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.save_alt, color: Colors.grey),
+                  const Icon(Icons.save_alt, color: Colors.grey),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Total data yang diterima: ${totalDataReceived} KB',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      'Total data yang diterima: $totalDataReceived KB',
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ],
@@ -103,12 +103,12 @@ class NetworkStatusPopup extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.block, color: Colors.red),
+                  const Icon(Icons.block, color: Colors.red),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Total paket yang diblokir: $blockedPackets',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ],
@@ -116,12 +116,12 @@ class NetworkStatusPopup extends StatelessWidget {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green),
+                  const Icon(Icons.check_circle, color: Colors.green),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'Jumlah paket yang berhasil: $successfulPackets',
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
                 ],

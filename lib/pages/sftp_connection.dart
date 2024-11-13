@@ -20,7 +20,7 @@ class SSHConnectionHelper {
   Future<SSHClient> _createClient() async {
     try {
       final socket = await SSHSocket.connect(hostname, port)
-          .timeout(Duration(seconds: 10)); // Timeout 10 detik
+          .timeout(const Duration(seconds: 10)); // Timeout 10 detik
       return SSHClient(
         socket,
         username: username,

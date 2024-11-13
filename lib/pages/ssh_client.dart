@@ -1,9 +1,9 @@
 import 'package:dartssh2/dartssh2.dart';
 
 Future<void> connectToSftpServer() async {
-  final String hostname = '192.168.100.10';
-  final String username = 'sftpusr1';
-  final String password = '123'; // Ganti dengan password yang benar
+  const String hostname = '192.168.100.10';
+  const String username = 'sftpusr1';
+  const String password = '123'; // Ganti dengan password yang benar
 
   try {
     // Inisialisasi socket SSH

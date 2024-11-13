@@ -157,7 +157,8 @@ class _HostPageState extends State<HostPage> {
                         itemCount: servers.isEmpty ? 1 : servers.length,
                         itemBuilder: (context, index) {
                           if (servers.isEmpty) {
-                            return Center(child: Text("Belum ada server"));
+                            return const Center(
+                                child: Text("Belum ada server"));
                           } else {
                             return _buildHostTile(servers[index], index);
                           }
@@ -187,7 +188,7 @@ class _HostPageState extends State<HostPage> {
       margin: const EdgeInsets.only(bottom: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: ListTile(
-        leading: Icon(Icons.cloud, color: Colors.blue),
+        leading: const Icon(Icons.cloud, color: Colors.blue),
         title: Text(server['name'] ?? 'Unknown'),
         subtitle: Text('${server['username']}, ${server['hostname']}'),
         onLongPress: () {
@@ -232,7 +233,7 @@ class _HostPageState extends State<HostPage> {
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           // Menampilkan loading spinner saat data sedang dimuat
-          return Center(child: CircularProgressIndicator());
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
@@ -241,7 +242,7 @@ class _HostPageState extends State<HostPage> {
 
         // Memastikan data sudah tersedia
         if (!snapshot.hasData || hostServers.isEmpty) {
-          return Center(child: Text("Belum ada host tersedia"));
+          return const Center(child: Text("Belum ada host tersedia"));
         }
 
         return ListView.builder(
@@ -253,14 +254,14 @@ class _HostPageState extends State<HostPage> {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12)),
               child: ListTile(
-                leading: Icon(Icons.cloud, color: Colors.blue),
+                leading: const Icon(Icons.cloud, color: Colors.blue),
                 title: Text(host['name'] ?? 'Unknown'),
                 subtitle: Text('${host['username']}, ${host['hostname']}'),
                 onTap: () => showDialog(
                   context: context,
                   builder: (BuildContext context) {
                     return AlertDialog(
-                      title: Text("Detail Host"),
+                      title: const Text("Detail Host"),
                       content: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,

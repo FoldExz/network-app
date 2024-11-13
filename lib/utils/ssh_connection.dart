@@ -77,7 +77,7 @@ class SSHConnection {
     if (_client != null) {
       final sftp = await _client!.sftp();
       final file = await sftp.open(filePath, mode: SftpFileOpenMode.write);
-      await file.writeBytes(utf8.encode(content) as Uint8List);
+      await file.writeBytes(utf8.encode(content));
     } else {
       throw Exception("Not connected to SSH server.");
     }

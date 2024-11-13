@@ -14,7 +14,7 @@ class NetworkCheck {
     try {
       final response = await http
           .get(Uri.parse('https://www.google.com'))
-          .timeout(Duration(seconds: 5));
+          .timeout(const Duration(seconds: 5));
       return response.statusCode == 200;
     } catch (_) {
       return false;

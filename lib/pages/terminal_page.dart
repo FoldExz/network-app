@@ -63,7 +63,7 @@ class _TerminalPageState extends State<TerminalPage> {
     } else {
       // Optionally, show an error or message to inform the user
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('This configuration already exists!')),
+        const SnackBar(content: Text('This configuration already exists!')),
       );
     }
   }
@@ -209,12 +209,12 @@ class _TerminalPageState extends State<TerminalPage> {
                             } else {
                               // Option 2: Show password input modal if password is missing
                               _showPasswordBottomSheet(context,
-                                  "ssh ${selectedUsername}@${selectedHost}");
+                                  "ssh $selectedUsername@$selectedHost");
                             }
                           } else {
                             // Handle any error cases, e.g., invalid host/username
                             ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
+                              const SnackBar(
                                   content:
                                       Text('Invalid saved host or username')),
                             );
@@ -245,7 +245,7 @@ class _TerminalPageState extends State<TerminalPage> {
 
   Future<void> _showPasswordBottomSheet(
       BuildContext context, String command) async {
-    bool _isLoading = false;
+    bool isLoading = false;
     bool isError = false;
 
     Map<String, String?> config = await _loadConfiguration();
@@ -376,7 +376,7 @@ class _TerminalPageState extends State<TerminalPage> {
                       style: const TextStyle(color: Colors.white),
                     ),
                     const SizedBox(height: 20),
-                    if (_isLoading)
+                    if (isLoading)
                       const LinearProgressIndicator(
                         valueColor:
                             AlwaysStoppedAnimation<Color>(Color(0xFF29B06C)),
@@ -387,7 +387,7 @@ class _TerminalPageState extends State<TerminalPage> {
                       child: ElevatedButton(
                         onPressed: () async {
                           setState(() {
-                            _isLoading = true;
+                            isLoading = true;
                             isError = false;
                           });
 
@@ -398,7 +398,7 @@ class _TerminalPageState extends State<TerminalPage> {
                           bool isReachable = await _checkHostAvailability(host);
                           if (!isReachable) {
                             setState(() {
-                              _isLoading = false;
+                              isLoading = false;
                               isError = true;
                             });
                             return;
@@ -416,7 +416,7 @@ class _TerminalPageState extends State<TerminalPage> {
                                 context); //membuka termninal screen
                           } catch (e) {
                             setState(() {
-                              _isLoading = false;
+                              isLoading = false;
                               isError = true;
                             });
 
@@ -473,7 +473,7 @@ class _TerminalPageState extends State<TerminalPage> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
+        const SnackBar(
           content: Text("Koneksi SSH gagal. Tidak dapat membuka terminal."),
         ),
       );
@@ -514,7 +514,7 @@ class _TerminalScreenState extends State<TerminalScreen> {
   String _output = "";
   double _fontSize = 14;
 
-  List<String> _commandHistory = [];
+  final List<String> _commandHistory = [];
   int _historyIndex = -1;
 
   Future<void> _sendCommand(String command) async {
