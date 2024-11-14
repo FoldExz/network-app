@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:io';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import '../utils/network_check.dart';
-import 'dart:math';
 
 class SpeedTestPage extends StatefulWidget {
   const SpeedTestPage({super.key});
@@ -16,18 +15,25 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
   bool isConnected = true;
   double? downloadSpeed;
   double? uploadSpeed;
-  StreamSubscription<bool>? _internetSubscription;
   bool isTesting = false;
+  Timer? _progressTimer;
+  StreamSubscription<bool>? _internetSubscription;
+  int progressPercent = 0; // Untuk menyimpan persen progres
 
-  // URL untuk pengujian download dan upload
   final String downloadUrl =
-      'https://hel1-speed.hetzner.com/100MB.bin'; // URL download baru
-  final String uploadUrl =
-      'http://192.168.100.11:3000/upload'; // URL upload server lokal
+      // 'http://192.168.100.11:3000/download/largeFile.bin';
+      // 'http://hil.icmp.hetzner.com/100MB.bin';
+      // 'http://ash.icmp.hetzner.com/100MB.bin';
+      // 'https://fsn1-speed.hetzner.com/100MB.bin';
+      'https://hel1-speed.hetzner.com/100MB.bin';
+  final String uploadUrl = 'http://192.168.137.79:3000/upload';
 
   @override
   void initState() {
     super.initState();
+
+    // Mendengarkan status koneksi internet
+
     _internetSubscription = NetworkCheck.internetStatusStream.listen((status) {
       setState(() {
         isConnected = status;
@@ -37,7 +43,11 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
 
   @override
   void dispose() {
-    _internetSubscription?.cancel();
+    _progressTimer?.cancel(); // Batalkan timer jika ada
+
+    _internetSubscription
+        ?.cancel(); // Membatalkan subscription ketika widget dibuang
+
     super.dispose();
   }
 
@@ -48,7 +58,11 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
       isTesting = true;
       downloadSpeed = null;
       uploadSpeed = null;
+      progressPercent = 0; // Reset persen progres
     });
+
+    // Mulai animasi progres
+    _startProgressAnimation();
 
     // Menjalankan pengujian download dan upload secara paralel
     var downloadFuture = _testDownloadSpeed();
@@ -70,6 +84,32 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
         isTesting = false;
       });
     }
+
+    // Setelah tes selesai, lanjutkan progres ke 100%
+    if (mounted) {
+      setState(() {
+        progressPercent = 100; // Progres akan jadi 100% jika tes selesai
+      });
+    }
+
+    _progressTimer?.cancel(); // Menghentikan animasi saat tes selesai
+  }
+
+  // Fungsi untuk memulai animasi progres
+  void _startProgressAnimation() {
+    _progressTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+      if (isTesting && progressPercent < 98) {
+        setState(() {
+          progressPercent += 2; // Tambah progres 2% setiap 100ms hingga 89%
+        });
+      } else if (!isTesting && progressPercent < 100) {
+        setState(() {
+          progressPercent += 1; // Lanjutkan progres ke 100 setelah tes selesai
+        });
+      } else {
+        _progressTimer?.cancel(); // Berhenti jika sudah 100% atau tes selesai
+      }
+    });
   }
 
   // Fungsi untuk mengonversi ukuran byte ke format yang lebih mudah dibaca (B, KB, MB, GB)
@@ -95,22 +135,19 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
   }
 
   Future<double?> _testDownloadSpeed() async {
-    print("Starting download speed test...");
+    print("Starting download test...");
     try {
       final stopwatch = Stopwatch()..start();
       final response = await http.get(Uri.parse(downloadUrl));
 
       if (response.statusCode == 200) {
         stopwatch.stop();
-        // Jika tidak ada response.contentLength, gunakan bodyBytes.length
         int bytes = response.contentLength ?? response.bodyBytes.length;
         double seconds = stopwatch.elapsedMilliseconds / 1000;
+        double speedMbps = (bytes / seconds) / (1024 * 1024) * 8;
 
-        // Pastikan pembagian waktu dalam detik dan ukuran dalam byte yang tepat
-        double speedMbps =
-            (bytes * 8) / (seconds * 1024 * 1024); // Kecepatan dalam Mbps
-
-        String fileSize = convertSize(bytes);
+        String fileSize = convertSize(
+            bytes); // Mengonversi ukuran file ke format yang lebih mudah dibaca
         print(
             "Download speed test successful: $speedMbps Mbps, File Size: $fileSize");
 
@@ -125,36 +162,25 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
   }
 
   Future<double?> _testUploadSpeed() async {
+    print("Starting upload test...");
     try {
       final stopwatch = Stopwatch()..start();
 
-      // Menggunakan MultipartRequest untuk memastikan bahwa file di-upload dengan benar
-      var request = http.MultipartRequest(
-        'POST',
-        Uri.parse(uploadUrl),
-      );
-
-      // Menyiapkan file untuk di-upload
+      var request = http.MultipartRequest('POST', Uri.parse(uploadUrl));
       var file = http.MultipartFile.fromBytes(
-        'file', // field name sesuai yang digunakan di server ('file')
-        List<int>.generate(
-            104857600, (index) => index % 256), // Dummy 100MB data
-        filename: 'filedummy.txt', // Nama file
+        'file',
+        List<int>.generate(104857600, (index) => index % 256),
+        filename: 'filedummy.txt',
       );
-
-      // Menambahkan file ke body request
       request.files.add(file);
 
-      // Kirim request
       var response = await request.send();
       stopwatch.stop();
 
-      // Menghitung kecepatan upload berdasarkan data yang dikirim
       int bytesSent = file.length;
       double seconds = stopwatch.elapsedMilliseconds / 1000;
       double speedMbps = (bytesSent / seconds) / (1024 * 1024) * 8;
 
-      // Mengecek respons
       if (response.statusCode == 200) {
         print("Upload speed: $speedMbps Mbps, Data Size: 100MB");
         return speedMbps;
@@ -165,6 +191,16 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
       print("Upload speed test failed: $e");
     }
     return null;
+  }
+
+  String getSpeedCategory(double speed) {
+    if (speed >= 50) {
+      return "Your internet is very fast!";
+    } else if (speed >= 10) {
+      return "Your internet is fast!";
+    } else {
+      return "Your internet is slow!";
+    }
   }
 
   @override
@@ -223,7 +259,7 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
                   ),
                   child: Center(
                     child: Text(
-                      isTesting ? 'Testing...' : 'START',
+                      isTesting ? '$progressPercent%' : 'START',
                       style: TextStyle(
                         fontFamily: 'Poppins',
                         fontWeight: FontWeight.w600,
@@ -253,6 +289,20 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
               color: Colors.white,
             ),
           ),
+          // Tambahkan dua baris jarak
+          SizedBox(height: screenHeight * 0.05),
+          // Tampilkan kategori kecepatan internet berdasarkan hasil download speed
+          if (downloadSpeed != null)
+            Text(
+              getSpeedCategory(downloadSpeed!),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Poppins',
+                fontWeight: FontWeight.w600,
+                fontSize: statusTextSize,
+                color: Colors.white,
+              ),
+            ),
         ],
       ),
     );
