@@ -14,33 +14,43 @@ class NetworkStatusPopup extends StatelessWidget {
   final double successRate;
   final int avgResponseTime;
   final int totalDataReceived;
-  final int blockedPackets; // Keep this declaration
-  final int successfulPackets; // Declare this field correctly
+  final int blockedPackets;
+  final int successfulPackets;
+  final bool isProcessing;
 
   const NetworkStatusPopup({
     super.key,
     required this.successRate,
     required this.avgResponseTime,
     required this.totalDataReceived,
-    required this.blockedPackets, // Keep this in the constructor
-    required this.successfulPackets, // Add this to the constructor
+    required this.blockedPackets,
+    required this.successfulPackets,
+    this.isProcessing = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    var mediaQuery = MediaQuery.of(context);
-    double screenWidth = mediaQuery.size.width;
+    String networkStatusText;
+    if (isProcessing) {
+      networkStatusText = 'Memproses data, harap tunggu...';
+    } else if (blockedPackets > 0) {
+      networkStatusText = 'Terdapat paket yang diblokir: $blockedPackets';
+    } else if (successfulPackets == 0) {
+      networkStatusText = 'Tidak ada koneksi internet.';
+    } else if (successfulPackets > 0 && avgResponseTime == 0) {
+      networkStatusText = 'Kesalahan koneksi (Connection Error).';
+    } else {
+      networkStatusText = 'Semua paket berhasil diterima.';
+    }
 
-    String networkStatusText = blockedPackets > 0
-        ? 'Terdapat paket yang diblokir: $blockedPackets'
-        : 'Semua paket berhasil diterima';
+    final screenWidth = MediaQuery.of(context).size.width; // Ambil lebar layar
 
     return Align(
       alignment: Alignment.bottomCenter,
       child: Padding(
         padding: const EdgeInsets.only(bottom: 70.0, top: 20.0),
         child: Container(
-          width: screenWidth * 0.9,
+          width: screenWidth * 0.9, // Gunakan nilai yang benar
           decoration: BoxDecoration(
             color: const Color(0xFF15181F).withOpacity(0.9),
             borderRadius: BorderRadius.circular(20),
@@ -62,13 +72,25 @@ class NetworkStatusPopup extends StatelessWidget {
               Row(
                 children: [
                   Icon(
-                    blockedPackets > 0 ? Icons.error : Icons.check_circle,
-                    color: blockedPackets > 0 ? Colors.red : Colors.green,
+                    blockedPackets > 0
+                        ? Icons.error
+                        : successfulPackets == 0
+                            ? Icons.wifi_off
+                            : avgResponseTime == 0
+                                ? Icons.warning
+                                : Icons.check_circle,
+                    color: blockedPackets > 0
+                        ? Colors.red
+                        : successfulPackets == 0
+                            ? Colors.orange
+                            : avgResponseTime == 0
+                                ? Colors.yellow
+                                : Colors.green,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      'Status Jaringan: ${blockedPackets > 0 ? "Terdapat paket yang diblokir: $blockedPackets" : "Semua paket berhasil diterima"}',
+                      networkStatusText,
                       style: const TextStyle(color: Colors.white, fontSize: 16),
                     ),
                   ),
@@ -243,7 +265,11 @@ class _SniffingPageState extends State<SniffingPage> {
       } else {
         print("Sniffing stopped: $isStarted");
         _timer?.cancel();
-        _calculateNetworkMetrics(); // Hitung dan tampilkan metrik
+
+        // Tambahkan delay sebelum memproses metrik
+        Future.delayed(const Duration(seconds: 2), () {
+          _calculateNetworkMetrics(); // Hitung dan tampilkan metrik
+        });
       }
     });
   }

@@ -26,7 +26,7 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
       // 'http://ash.icmp.hetzner.com/100MB.bin';
       // 'https://fsn1-speed.hetzner.com/100MB.bin';
       'https://hel1-speed.hetzner.com/100MB.bin';
-  final String uploadUrl = 'http://192.168.137.79:3000/upload';
+  final String uploadUrl = 'http://192.168.100.12:3000/upload';
 
   @override
   void initState() {
@@ -97,7 +97,7 @@ class _SpeedTestPageState extends State<SpeedTestPage> {
 
   // Fungsi untuk memulai animasi progres
   void _startProgressAnimation() {
-    _progressTimer = Timer.periodic(Duration(milliseconds: 100), (timer) {
+    _progressTimer = Timer.periodic(const Duration(milliseconds: 100), (timer) {
       if (isTesting && progressPercent < 98) {
         setState(() {
           progressPercent += 2; // Tambah progres 2% setiap 100ms hingga 89%

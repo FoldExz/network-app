@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter1/styles/app_color.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/ssh_connection.dart';
 import 'dir_screen.dart';
@@ -340,8 +341,8 @@ void addHostBottomSheet(BuildContext context, Function refreshHosts) {
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: const BoxDecoration(
-            color: Color(
-                0xFF15181F), // Mengubah warna latar belakang menjadi #15181F
+            color: AppColors
+                .darkGray, // Sesuaikan dengan latar belakang terminal_page
             borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
           ),
           child: StatefulBuilder(
@@ -351,35 +352,70 @@ void addHostBottomSheet(BuildContext context, Function refreshHosts) {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "Add Host",
-                      style: TextStyle(fontSize: 20, color: Colors.white),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Add Host",
+                          style: TextStyle(
+                            fontSize: 20,
+                            color: AppColors
+                                .white, // Sama dengan desain terminal_page
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        GestureDetector(
+                          onTap: () {
+                            Navigator.pop(context); // Menutup modal jika Cancel
+                          },
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.normal,
+                              color: AppColors
+                                  .green, // Sama dengan desain terminal_page
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     const SizedBox(height: 20),
+                    // Kolom untuk Name
                     _buildTextField(
-                        label: 'Name',
-                        onChanged: (value) => name = value,
-                        initialValue: name),
+                      label: 'Name',
+                      onChanged: (value) => name = value,
+                      initialValue: name,
+                    ),
                     const SizedBox(height: 12),
+                    // Kolom untuk Hostname/IP Address
                     _buildTextField(
-                        label: 'Hostname / IP Address',
-                        onChanged: (value) => hostname = value,
-                        initialValue: hostname),
+                      label: 'Hostname / IP Address',
+                      onChanged: (value) => hostname = value,
+                      initialValue: hostname,
+                    ),
                     const SizedBox(height: 12),
+                    // Kolom untuk Port
                     _buildTextField(
-                        label: 'Port',
-                        onChanged: (value) => port = value,
-                        initialValue: port),
+                      label: 'Port',
+                      onChanged: (value) => port = value,
+                      initialValue: port,
+                    ),
                     const SizedBox(height: 12),
+                    // Kolom untuk Username
                     _buildTextField(
-                        label: 'Username',
-                        onChanged: (value) => username = value,
-                        initialValue: username),
+                      label: 'Username',
+                      onChanged: (value) => username = value,
+                      initialValue: username,
+                    ),
                     const SizedBox(height: 12),
+                    // Kolom untuk Password
                     PasswordField(
-                        onChanged: (value) => password = value,
-                        initialValue: password),
+                      onChanged: (value) => password = value,
+                      initialValue: password,
+                    ),
                     const SizedBox(height: 20),
+                    // Tombol untuk menyimpan host
                     ElevatedButton(
                       onPressed: () async {
                         final newHost = {
@@ -407,10 +443,15 @@ void addHostBottomSheet(BuildContext context, Function refreshHosts) {
                       style: ElevatedButton.styleFrom(
                         minimumSize: const Size(double.infinity, 50),
                         backgroundColor: const Color(
-                            0xFF343746), // Mengubah warna tombol menjadi #343746
+                            0xFF343746), // Sesuaikan dengan desain terminal_page
                       ),
-                      child: const Text("Tambah",
-                          style: TextStyle(fontSize: 18, color: Colors.white)),
+                      child: const Text(
+                        "Continue",
+                        style: TextStyle(
+                          fontSize: 18,
+                          color: Colors.white,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -501,17 +542,17 @@ void modifyHostBottomSheet(BuildContext context, Map<String, String> host,
                         label: 'Name',
                         onChanged: (value) => name = value,
                         initialValue: name),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _buildTextField(
                         label: 'Hostname / IP Address',
                         onChanged: (value) => hostname = value,
                         initialValue: hostname),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _buildTextField(
                         label: 'Port',
                         onChanged: (value) => port = value,
                         initialValue: port),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: 10),
                     _buildTextField(
                         label: 'Username',
                         onChanged: (value) => username = value,
@@ -541,7 +582,7 @@ void modifyHostBottomSheet(BuildContext context, Map<String, String> host,
                         minimumSize: const Size(double.infinity, 50),
                         backgroundColor: const Color(0xFF343746),
                       ),
-                      child: const Text("Simpan",
+                      child: const Text("Save",
                           style: TextStyle(fontSize: 18, color: Colors.white)),
                     ),
                   ],
@@ -559,20 +600,30 @@ void modifyHostBottomSheet(BuildContext context, Map<String, String> host,
 Widget _buildTextField({
   required String label,
   required Function(String) onChanged,
-  String initialValue = '',
+  required String initialValue,
 }) {
   return TextField(
     controller: TextEditingController(text: initialValue),
-    onChanged: onChanged,
-    style: const TextStyle(color: Colors.white),
     decoration: InputDecoration(
       labelText: label,
-      labelStyle: const TextStyle(color: Colors.white),
+      labelStyle: const TextStyle(
+        fontFamily: 'Poppins',
+        fontWeight: FontWeight.w500,
+        color: Color(0xFF8C91A5), // Warna label
+      ),
       filled: true,
-      fillColor: const Color(0xFF15181F),
-      border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      fillColor: const Color(0xFF15181F), // Warna latar belakang
+      enabledBorder: const UnderlineInputBorder(
+        borderSide: BorderSide(
+            color: Color(0xFF242834)), // Garis bawah saat tidak fokus
+      ),
+      focusedBorder: const UnderlineInputBorder(
+        borderSide:
+            BorderSide(color: Color(0xFF242834)), // Garis bawah saat fokus
+      ),
     ),
+    style: const TextStyle(color: Colors.white), // Warna teks
+    onChanged: onChanged, // Fungsi untuk menangani perubahan input
   );
 }
 
@@ -618,7 +669,6 @@ class _PasswordFieldState extends State<PasswordField> {
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: 'Password',
-        labelStyle: const TextStyle(color: Colors.white),
         suffixIcon: IconButton(
           icon: Icon(
             _isObscured ? Icons.visibility : Icons.visibility_off,
@@ -632,9 +682,14 @@ class _PasswordFieldState extends State<PasswordField> {
         ),
         filled: true,
         fillColor: const Color(0xFF15181F),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+        // Mengganti OutlineInputBorder dengan UnderlineInputBorder
+        enabledBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(
+              color: Color(0xFF242834)), // Garis bawah saat tidak fokus
+        ),
+        focusedBorder: const UnderlineInputBorder(
+          borderSide:
+              BorderSide(color: Color(0xFF242834)), // Garis bawah saat fokus
         ),
       ),
     );

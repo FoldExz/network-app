@@ -38,38 +38,168 @@ class _TerminalPageState extends State<TerminalPage> {
           return {
             'host': parts[0],
             'username': parts[1],
+            'password': parts.length > 2 ? parts[2] : "",
           };
         }).toList();
       });
+      print('Loaded hosts: $savedHosts'); // Debugging
     }
   }
 
   // Save a new host to SharedPreferences, ensuring no duplicates
-  Future<void> _saveHost(String host, String username) async {
+  Future<void> _saveHost(String host, String username, String password,
+      {bool isEdit = false, int? index}) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> hostList = prefs.getStringList('savedHosts') ?? [];
+    if (isEdit && index != null) {
+      hostList[index] = '$host|$username|$password';
+      savedHosts[index] = {
+        'host': host,
+        'username': username,
+        'password': password, // Pastikan password diperbarui di savedHosts
+      };
+    } else {
+      bool exists = hostList.any((item) {
+        final parts = item.split('|');
+        return parts[0] == host && parts[1] == username;
+      });
+
+      if (!exists) {
+        hostList.add('$host|$username|$password');
+        savedHosts.add({
+          'host': host,
+          'username': username,
+          'password': password,
+        });
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('This configuration already exists!')),
+        );
+        return;
+      }
+    }
+
+    await prefs.setStringList('savedHosts', hostList);
+    _loadHosts(); // Refresh UI
+  }
+
+  Future<void> _deleteHost(int index) async {
     final prefs = await SharedPreferences.getInstance();
     List<String> hostList = prefs.getStringList('savedHosts') ?? [];
 
-    // Check if the host and username combination already exists
-    bool exists = hostList.any((item) {
-      final parts = item.split('|');
-      return parts[0] == host && parts[1] == username;
-    });
+    // Hapus host berdasarkan index
+    hostList.removeAt(index);
 
-    if (!exists) {
-      // If the host-username combination doesn't exist, add it
-      hostList.add('$host|$username');
-      await prefs.setStringList('savedHosts', hostList);
-      _loadHosts(); // Reload hosts after saving
-    } else {
-      // Optionally, show an error or message to inform the user
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This configuration already exists!')),
-      );
-    }
+    // Simpan kembali daftar yang telah diperbarui
+    await prefs.setStringList('savedHosts', hostList);
+
+    // Muat ulang daftar host
+    _loadHosts();
   }
 
   @override
   Widget build(BuildContext context) {
+    // Daftar perintah dengan kategori yang dikelompokkan
+    final List<Map<String, dynamic>> commands = [
+      {
+        'category': 'SSH Commands',
+        'commands': [
+          {
+            'command': 'ssh [user@]host[:port]',
+            'example': 'ssh user@192.168.1.1',
+          },
+          {
+            'command': 'scp [file] [user@]host:[path]',
+            'example': 'scp myfile.txt user@192.168.1.1:/path/to/directory',
+          },
+          {
+            'command': 'ssh-keygen -t rsa',
+            'example': 'Generate SSH key pair',
+          },
+        ],
+      },
+      {
+        'category': 'Windows Commands',
+        'commands': [
+          {
+            'command': 'ipconfig',
+            'example': 'Display IP configuration',
+          },
+          {
+            'command': 'ping',
+            'example': 'Ping a host to check network connectivity',
+          },
+          {
+            'command': 'dir',
+            'example': 'List directory contents',
+          },
+          {
+            'command': 'netstat',
+            'example': 'Display network connections and listening ports',
+          },
+        ],
+      },
+      {
+        'category': 'Linux Commands',
+        'commands': [
+          {
+            'command': 'ls',
+            'example': 'List directory contents',
+          },
+          {
+            'command': 'top',
+            'example': 'Display running processes',
+          },
+          {
+            'command': 'chmod',
+            'example': 'Change file permissions',
+          },
+          {
+            'command': 'df -h',
+            'example': 'Display disk space usage',
+          },
+        ],
+      },
+      {
+        'category': 'Cisco Commands',
+        'commands': [
+          {
+            'command': 'show ip interface brief',
+            'example': 'Show IP interface status',
+          },
+          {
+            'command': 'show running-config',
+            'example': 'Display the current running configuration',
+          },
+          {
+            'command': 'ping',
+            'example': 'Ping a remote device to check connectivity',
+          },
+          {
+            'command': 'show version',
+            'example': 'Display system hardware and software version',
+          },
+        ],
+      },
+    ];
+
+    // Membuat list untuk semua commands yang digabungkan dengan kategori sebagai judul
+    final List<Map<String, String>> allCommands = [];
+    for (var category in commands) {
+      // Menambahkan kategori sebagai item pertama
+      allCommands.add({
+        'command': category['category']!,
+        'example': '', // Kategori tidak memiliki contoh
+      });
+      // Menambahkan semua commands dalam kategori
+      for (var cmd in category['commands']) {
+        allCommands.add({
+          'command': cmd['command']!,
+          'example': cmd['example']!,
+        });
+      }
+    }
+
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -102,7 +232,7 @@ class _TerminalPageState extends State<TerminalPage> {
                         child: TextField(
                           style: const TextStyle(color: AppColors.white),
                           decoration: InputDecoration(
-                            hintText: 'Search / Type a command',
+                            hintText: 'Type a command, ssh...',
                             hintStyle: TextStyle(
                               color: AppColors.mediumGray,
                               fontSize: baseFontSize * 0.9,
@@ -112,6 +242,15 @@ class _TerminalPageState extends State<TerminalPage> {
                           onSubmitted: (command) {
                             if (command.startsWith("ssh")) {
                               _showPasswordBottomSheet(context, command);
+                            } else {
+                              // Tampilkan snackbar jika perintah tidak dikenal
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Command tidak ditemukan'),
+                                  backgroundColor:
+                                      Color.fromARGB(255, 255, 255, 255),
+                                ),
+                              );
                             }
                           },
                         ),
@@ -129,33 +268,38 @@ class _TerminalPageState extends State<TerminalPage> {
                   ),
                 ),
                 const SizedBox(height: 20),
-                Flexible(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        CommandItem(
-                          command: 'ssh [user@]host[:port]',
-                          example: 'ssh user@192.168.1.1',
+                // Gunakan ListView.builder untuk daftar command items
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: allCommands.length,
+                    itemBuilder: (context, index) {
+                      final command = allCommands[index];
+                      final commandText = command['command']!;
+                      final example = command['example']!;
+
+                      // Jika command adalah kategori, tampilkan sebagai teks kategori
+                      if (example.isEmpty) {
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Text(
+                            commandText, // Kategori
+                            style: TextStyle(
+                              fontSize: baseFontSize - 2,
+                              color: AppColors.white,
+                              fontFamily: 'Poppins',
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        );
+                      } else {
+                        // Jika command adalah perintah, tampilkan sebagai CommandItem
+                        return CommandItem(
+                          command: commandText,
+                          example: example,
                           baseFontSize: baseFontSize,
-                        ),
-                        CommandItem(
-                          command: 'ping host',
-                          example: 'ping google.com',
-                          baseFontSize: baseFontSize,
-                        ),
-                        CommandItem(
-                          command: 'traceroute host',
-                          example: 'traceroute google.com',
-                          baseFontSize: baseFontSize,
-                        ),
-                        CommandItem(
-                          command: 'ifconfig',
-                          example: 'ifconfig eth0',
-                          baseFontSize: baseFontSize,
-                        ),
-                      ],
-                    ),
+                        );
+                      }
+                    },
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -169,61 +313,62 @@ class _TerminalPageState extends State<TerminalPage> {
                 ),
                 const SizedBox(height: 10),
                 // Display saved hosts in ListView
-                // Inside ListView.builder:
                 Expanded(
-                  child: ListView.builder(
-                    itemCount: savedHosts.length,
-                    itemBuilder: (context, index) {
-                      final host = savedHosts[index];
-                      return ListTile(
-                        title: Text(
-                          host['host'] ?? '',
-                          style: TextStyle(
-                              color: AppColors.white, fontSize: baseFontSize),
-                        ),
-                        subtitle: Text(
-                          host['username'] ?? '',
-                          style: TextStyle(
-                            color: AppColors.mediumGray,
-                            fontSize: baseFontSize * 0.9,
+                  child: savedHosts.isEmpty
+                      ? Center(
+                          child: Text(
+                            'Belum ada konfigurasi host',
+                            style: TextStyle(
+                              color: const Color.fromARGB(255, 255, 255, 255),
+                              fontFamily: 'Poppins',
+                            ),
                           ),
-                        ),
-                        onTap: () async {
-                          // Grab the host and username from the tapped saved host
-                          String selectedHost = host['host'] ?? '';
-                          String selectedUsername = host['username'] ?? '';
+                        )
+                      : ListView.builder(
+                          itemCount: savedHosts.length,
+                          itemBuilder: (context, index) {
+                            final host = savedHosts[index];
+                            return ListTile(
+                              title: Text(
+                                host['host'] ?? '',
+                                style: TextStyle(
+                                    color: AppColors.white,
+                                    fontSize: baseFontSize),
+                              ),
+                              subtitle: Text(
+                                host['username'] ??
+                                    '', // Hanya tampilkan username
+                                style: TextStyle(
+                                    color: AppColors.mediumGray,
+                                    fontSize: baseFontSize * 0.9),
+                              ),
+                              onTap: () async {
+                                String selectedHost = host['host'] ?? '';
+                                String selectedUsername =
+                                    host['username'] ?? '';
+                                String? savedPassword = host['password'];
 
-                          // Optionally, you could load the password from SharedPreferences, or prompt the user for it
-                          Map<String, String?> config =
-                              await _loadConfiguration();
-                          String? savedPassword = config['password'];
+                                print(
+                                    'Host: $selectedHost, Username: $selectedUsername, Password: $savedPassword');
 
-                          // You can use this data to either connect directly or show a password entry modal
-                          if (selectedHost.isNotEmpty &&
-                              selectedUsername.isNotEmpty) {
-                            // Option 1: Direct connection (if password is available)
-                            if (savedPassword != null) {
-                              _sshConnection.connect(selectedHost,
-                                  selectedUsername, savedPassword);
-                              _showTerminalScreen(context);
-                            } else {
-                              // Option 2: Show password input modal if password is missing
-                              _showPasswordBottomSheet(context,
-                                  "ssh $selectedUsername@$selectedHost");
-                            }
-                          } else {
-                            // Handle any error cases, e.g., invalid host/username
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                  content:
-                                      Text('Invalid saved host or username')),
+                                if (selectedHost.isNotEmpty &&
+                                    selectedUsername.isNotEmpty) {
+                                  await _sshConnection.connect(
+                                    selectedHost,
+                                    selectedUsername,
+                                    savedPassword!,
+                                  );
+                                  _showTerminalScreen(context);
+                                }
+                              },
+                              onLongPress: () {
+                                // Panggil modal untuk mengedit host
+                                _showEditHostBottomSheet(context, index, host);
+                              },
                             );
-                          }
-                        },
-                      );
-                    },
-                  ),
-                )
+                          },
+                        ),
+                ),
               ],
             ),
           );
@@ -245,14 +390,11 @@ class _TerminalPageState extends State<TerminalPage> {
 
   Future<void> _showPasswordBottomSheet(
       BuildContext context, String command) async {
-    bool isLoading = false;
-    bool isError = false;
+    // Load initial values
+    String host = "";
+    String username = "";
+    String password = "";
 
-    Map<String, String?> config = await _loadConfiguration();
-    String host = config['host'] ?? '';
-    String username = config['username'] ?? '';
-
-    // If command is provided, parse it
     if (command.startsWith("ssh")) {
       final regex = RegExp(r"ssh\s+([^\@]+)\@([^\s]+)");
       final match = regex.firstMatch(command);
@@ -263,185 +405,137 @@ class _TerminalPageState extends State<TerminalPage> {
       }
     }
 
+    // Set initial values for controllers
     _hostController.text = host;
     _usernameController.text = username;
+    _passwordController.text = password;
 
+    // Show the modal bottom sheet
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (BuildContext context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                bottom: MediaQuery.of(context).viewInsets.bottom,
-              ),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: const BoxDecoration(
-                  color: AppColors.darkGray,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+        return Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: AppColors.darkGray,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          'New host',
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.white,
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.pop(context);
-                          },
-                          child: const Text(
-                            'Cancel',
-                            style: TextStyle(
-                              fontFamily: 'Poppins',
-                              fontWeight: FontWeight.normal,
-                              color: AppColors.green,
-                            ),
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'New Host',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.white,
+                      ),
                     ),
-                    const SizedBox(height: 20),
-                    TextField(
-                      controller: _hostController,
-                      decoration: const InputDecoration(
-                        labelText: 'Host Address',
-                        labelStyle: TextStyle(
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
                           fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF8C91A5),
-                        ),
-                        filled: true,
-                        fillColor: Color(0xFF15181F),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF242834)),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF242834)),
-                        ),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _usernameController,
-                      decoration: const InputDecoration(
-                        labelText: 'Username',
-                        labelStyle: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF8C91A5),
-                        ),
-                        filled: true,
-                        fillColor: Color(0xFF15181F),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF242834)),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF242834)),
-                        ),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 10),
-                    TextField(
-                      controller: _passwordController,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Password',
-                        labelStyle: TextStyle(
-                          fontFamily: 'Poppins',
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF8C91A5),
-                        ),
-                        filled: true,
-                        fillColor: Color(0xFF15181F),
-                        enabledBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF242834)),
-                        ),
-                        focusedBorder: UnderlineInputBorder(
-                          borderSide: BorderSide(color: Color(0xFF242834)),
-                        ),
-                      ),
-                      style: const TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 20),
-                    if (isLoading)
-                      const LinearProgressIndicator(
-                        valueColor:
-                            AlwaysStoppedAnimation<Color>(Color(0xFF29B06C)),
-                      ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () async {
-                          setState(() {
-                            isLoading = true;
-                            isError = false;
-                          });
-
-                          String host = _hostController.text;
-                          String username = _usernameController.text;
-                          String password = _passwordController.text;
-
-                          bool isReachable = await _checkHostAvailability(host);
-                          if (!isReachable) {
-                            setState(() {
-                              isLoading = false;
-                              isError = true;
-                            });
-                            return;
-                          }
-
-                          try {
-                            await _sshConnection.connect(
-                                host, username, password);
-                            // Save configuration dan host
-                            await _saveConfiguration(host, username, password);
-                            await _saveHost(host, username);
-
-                            Navigator.pop(context);
-                            _showTerminalScreen(
-                                context); //membuka termninal screen
-                          } catch (e) {
-                            setState(() {
-                              isLoading = false;
-                              isError = true;
-                            });
-
-                            print("Connection failed: $e");
-                          }
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF343746),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: const Text(
-                          "Continue",
-                          style: TextStyle(
-                            fontFamily: 'Poppins',
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFFFFFF),
-                          ),
+                          fontWeight: FontWeight.normal,
+                          color: AppColors.green,
                         ),
                       ),
                     ),
                   ],
                 ),
-              ),
-            );
-          },
+                const SizedBox(height: 20),
+                TextField(
+                  controller: _hostController,
+                  decoration: const InputDecoration(
+                    labelText: 'Host Address',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF8C91A5),
+                    ),
+                    filled: true,
+                    fillColor: Color(0xFF15181F),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF242834)),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF242834)),
+                    ),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: _usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    labelStyle: TextStyle(
+                      fontFamily: 'Poppins',
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF8C91A5),
+                    ),
+                    filled: true,
+                    fillColor: Color(0xFF15181F),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF242834)),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF242834)),
+                    ),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 10),
+
+                // Gunakan PasswordField untuk input password
+
+                PasswordField(
+                  controller:
+                      _passwordController, // Langsung menggunakan controller
+                ),
+
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      // Grab the values from controllers
+                      String host = _hostController.text;
+                      String username = _usernameController.text;
+                      String password = _passwordController.text;
+
+                      // Save the host configuration
+                      await _saveHost(host, username, password);
+
+                      Navigator.pop(context); // Close the modal
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF343746),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      "Continue",
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFFFFFFF),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
@@ -459,6 +553,156 @@ class _TerminalPageState extends State<TerminalPage> {
     }
 
     return isReachable;
+  }
+
+  void _showEditHostBottomSheet(
+      BuildContext context, int index, Map<String, String> host) {
+    // Deklarasi TextEditingController untuk setiap field
+    final TextEditingController hostController =
+        TextEditingController(text: host['host']);
+    final TextEditingController usernameController =
+        TextEditingController(text: host['username']);
+    final TextEditingController passwordController =
+        TextEditingController(text: host['password']); // Tambahkan di sini
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (BuildContext context) {
+        return Padding(
+          padding:
+              EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: const BoxDecoration(
+              color: AppColors.darkGray,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Edit Host',
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.white,
+                      ),
+                    ),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: () async {
+                        // Fungsi hapus
+                        await _deleteHost(index);
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        'Delete',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.normal,
+                          color: Colors.red,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pop(context);
+                      },
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          fontFamily: 'Poppins',
+                          fontWeight: FontWeight.normal,
+                          color: AppColors.green,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: hostController,
+                  decoration: const InputDecoration(
+                    labelText: 'Host Address',
+                    labelStyle: TextStyle(color: Color(0xFF8C91A5)),
+                    filled: true,
+                    fillColor: Color(0xFF15181F),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF242834)),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF242834)),
+                    ),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: usernameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Username',
+                    labelStyle: TextStyle(color: Color(0xFF8C91A5)),
+                    filled: true,
+                    fillColor: Color(0xFF15181F),
+                    enabledBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF242834)),
+                    ),
+                    focusedBorder: UnderlineInputBorder(
+                      borderSide: BorderSide(color: Color(0xFF242834)),
+                    ),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 10),
+                // Gunakan PasswordField untuk input password
+                PasswordField(
+                  controller:
+                      passwordController, // Pastikan controller dihubungkan
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      String updatedHost = hostController.text;
+                      String updatedUsername = usernameController.text;
+                      String updatedPassword = passwordController.text;
+
+                      await _saveHost(
+                        updatedHost,
+                        updatedUsername,
+                        updatedPassword,
+                        isEdit: true,
+                        index: index,
+                      );
+
+                      Navigator.pop(context); // Tutup modal
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF343746),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: const Text(
+                      "Save",
+                      style: TextStyle(
+                        fontFamily: 'Poppins',
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFFFFFFF),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showTerminalScreen(BuildContext context) async {
@@ -711,7 +955,12 @@ class _TerminalScreenState extends State<TerminalScreen> {
 
 // Widget untuk input password dengan show/hide
 class PasswordField extends StatefulWidget {
-  const PasswordField({super.key});
+  final TextEditingController controller;
+
+  const PasswordField({
+    super.key,
+    required this.controller,
+  });
 
   @override
   _PasswordFieldState createState() => _PasswordFieldState();
@@ -723,7 +972,8 @@ class _PasswordFieldState extends State<PasswordField> {
   @override
   Widget build(BuildContext context) {
     return TextField(
-      obscureText: _isObscured,
+      controller: widget.controller, // Gunakan controller dari parent
+      obscureText: _isObscured, // Tampilkan/hide password
       style: const TextStyle(color: Colors.white),
       decoration: InputDecoration(
         labelText: 'Password',
@@ -735,15 +985,17 @@ class _PasswordFieldState extends State<PasswordField> {
           ),
           onPressed: () {
             setState(() {
-              _isObscured = !_isObscured;
+              _isObscured = !_isObscured; // Toggle password visibility
             });
           },
         ),
         filled: true,
         fillColor: const Color(0xFF15181F),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+        enabledBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFF242834)),
+        ),
+        focusedBorder: const UnderlineInputBorder(
+          borderSide: BorderSide(color: Color(0xFF242834)),
         ),
       ),
     );

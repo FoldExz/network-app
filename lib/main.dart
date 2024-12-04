@@ -10,7 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MainApp()); // Remove `const` here
+  runApp(const MainApp());
 }
 
 class MainApp extends StatelessWidget {
@@ -27,10 +27,12 @@ class MainApp extends StatelessWidget {
           bodyLarge: TextStyle(fontFamily: 'Poppins'),
           bodyMedium: TextStyle(fontFamily: 'Poppins'),
         ),
+        splashColor: Colors.transparent, // Hilangkan efek ripple
+        highlightColor: Colors.transparent, // Hilangkan highlight
       ),
       home: const HomePage(),
       routes: {
-        '/details': (context) => const DetailsScreen(), // Remove `const` here
+        '/details': (context) => const DetailsScreen(),
       },
     );
   }
@@ -107,6 +109,15 @@ class _HomePageState extends State<HomePage> {
         unselectedItemColor: Colors.white.withOpacity(0.4),
         backgroundColor: Colors.black,
         type: BottomNavigationBarType.fixed,
+        enableFeedback: false, // Nonaktifkan efek getaran/sentuhan
+        selectedIconTheme: const IconThemeData(
+          color: Colors.white, // Warna ikon saat dipilih
+          opacity: 1.0,
+        ),
+        unselectedIconTheme: const IconThemeData(
+          color: Colors.white70, // Warna ikon saat tidak dipilih
+          opacity: 0.4,
+        ),
         onTap: _onItemTapped,
       ),
     );
