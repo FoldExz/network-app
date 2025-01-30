@@ -1,6 +1,6 @@
 
-Cyber Optik
-# network-app
+Flutter Networking App
+# Cyber Optik
 
 Cyber Optik is a multifunctional network utility app developed using Flutter. It provides tools for monitoring, securing, and optimizing internet connections. The key features include:
 
